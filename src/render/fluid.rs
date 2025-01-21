@@ -322,6 +322,13 @@ impl FromWorld for ResetPipeline {
         let divergence_shader = world
             .resource::<AssetServer>()
             .load("divergence.wgsl");
+        let advection_shader = world
+            .resource::<AssetServer>()
+            .load("advection.wgsl");
+
+        let divergence_shader = world
+            .resource::<AssetServer>()
+            .load("divergence.wgsl");
 
         let curl_shader = world
             .resource::<AssetServer>()
@@ -397,6 +404,33 @@ impl FromWorld for ResetPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<SplatUniform>(false),
+                ),
+            ),
+        );
+        let advection_layout = render_device.create_bind_group_layout(
+            "advection_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<AdvectionUniform>(false),
+                ),
+            ),
+        );
+        let divergencen_layout = render_device.create_bind_group_layout(
+            "divergencen_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
                 ),
             ),
         );
