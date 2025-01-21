@@ -238,6 +238,14 @@ struct AdvectionUniform {
     dt : f32,
     dissipation : f32
 }
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+struct SandUniform {
+    t: f32,
+    dpi: f32,
+    resolution: Vec2,
+    // 0 1
+    is_snapshot: u32
+}
 #[derive(Resource)]
 struct ResetPipeline {
     reset_bind_group_layout: BindGroupLayout,
@@ -307,6 +315,25 @@ impl FromWorld for ResetPipeline {
         let splat_out_shader = world
             .resource::<AssetServer>()
             .load("splat.wgsl");
+        let advection_shader = world
+            .resource::<AssetServer>()
+            .load("advection.wgsl");
+
+        let divergence_shader = world
+            .resource::<AssetServer>()
+            .load("divergence.wgsl");
+
+        let curl_shader = world
+            .resource::<AssetServer>()
+            .load("curl.wgsl");
+
+        let pressure_shader = world
+            .resource::<AssetServer>()
+            .load("pressure.wgsl");
+
+        let gradient_subtract_shader = world
+            .resource::<AssetServer>()
+            .load("gradientSubtract.wgsl");
 
         let clear_layout = render_device.create_bind_group_layout(
             "clear_layout",
@@ -317,7 +344,7 @@ impl FromWorld for ResetPipeline {
                     // The screen texture
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     texture_2d(TextureSampleType::Float { filterable: true }),
-                    uniform_buffer::<ClearValue>(false),
+                    uniform_buffer::<ClearUniform>(false),
                 ),
             ),
         );
@@ -373,6 +400,74 @@ impl FromWorld for ResetPipeline {
                 ),
             ),
         );
+        let advection_layout = render_device.create_bind_group_layout(
+            "advection_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<AdvectionUniform>(false),
+                ),
+            ),
+        );
+        let divergencen_layout = render_device.create_bind_group_layout(
+            "divergencen_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                ),
+            ),
+        );
+
+        let curl_layout = render_device.create_bind_group_layout(
+            "curl_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                ),
+            ),
+        );
+
+        let pressure_layout = render_device.create_bind_group_layout(
+            "pressure_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                ),
+            ),
+        );
+
+        let gradient_subtract_layout = render_device.create_bind_group_layout(
+            "gradient_subtract_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                ),
+            ),
+        );
+
         let init_reset_pipeline = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue it's creation
@@ -503,12 +598,12 @@ impl FromWorld for ResetPipeline {
                 multisample: MultisampleState::default(),
                 push_constant_ranges: vec![],
             });
-        let init_splat_pipeline = world
+        let init_advection_pipeline = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue it's creation
             .queue_render_pipeline(RenderPipelineDescriptor {
-                label: Some("splat_pipeline".into()),
-                layout: vec![base_vertex_layout.clone(),splat_layout.clone()],
+                label: Some("init_advection_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),advection_layout.clone()],
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: VertexState {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
@@ -517,7 +612,7 @@ impl FromWorld for ResetPipeline {
                     buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
-                    shader: splat_out_shader.clone(),
+                    shader: advection_shader.clone(),
                     shader_defs: vec![],
                     // Make sure this matches the entry point of your shader.
                     // It can be anything as long as it matches here and in the shader.
@@ -535,14 +630,209 @@ impl FromWorld for ResetPipeline {
                 multisample: MultisampleState::default(),
                 push_constant_ranges: vec![],
             });
+
+        let init_divergence_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_divergence_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),divergencen_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: divergence_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
+        let init_curl_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_curl_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),curl_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: curl_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
+        let init_pressure_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_pressure_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),pressure_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: pressure_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
+
+        let init_gradient_subtract_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_gradient_subtract_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),gradient_subtract_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: gradient_subtract_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
+        let sand_vertex_layout =render_device.create_bind_group_layout(
+            "sand_vertex_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::VERTEX,
+                (
+                    // The screen texture
+                    uniform_buffer::<VertexInput>(false),
+                ),
+            ),
+        );
+        let sand_layout =render_device.create_bind_group_layout(
+            "sand_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    uniform_buffer::<SandUniform>(false),
+                ),
+            ),
+        );
+        let init_sand_subtract_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_sand_subtract_pipeline".into()),
+                layout: vec![sand_vertex_layout.clone(),sand_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: gradient_subtract_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
         ResetPipeline {
             reset_bind_group_layout: layout,
             init_reset_pipeline,
             init_display_pipeline,
             init_velocity_out_pipeline,
             init_splat_pipeline,
-            init_splat_pipeline,
-
+            init_advection_pipeline,
+            init_divergence_pipeline,
+            init_curl_pipeline,
+            init_pressure_pipeline,
+            init_gradient_subtract_pipeline,
+            init_sand_subtract_pipeline
 
         }
     }

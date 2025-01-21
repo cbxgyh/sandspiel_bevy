@@ -16,6 +16,6 @@ fn main(@location(0) vUv: vec2<f32>) -> @location(0) vec4<f32> {
     // 从 uTexture 纹理中采样
     let texColor: vec4<f32> = textureSample(uTexture, sampler(uTexture), vUv);
     // 计算最终的颜色
-    let finalColor: vec4<f32> = value * (texColor + vec4<f32>(pressure, pressure, pressure, 1.0));
+    let finalColor: vec4<f32> = value.value * (texColor + vec4<f32>(pressure, pressure, pressure, 1.0));
     return finalColor;
 }
