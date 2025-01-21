@@ -307,6 +307,13 @@ impl FromWorld for ResetPipeline {
         let splat_out_shader = world
             .resource::<AssetServer>()
             .load("splat.wgsl");
+        let advection_shader = world
+            .resource::<AssetServer>()
+            .load("advection.wgsl");
+
+        let divergence_shader = world
+            .resource::<AssetServer>()
+            .load("divergence.wgsl");
 
         let clear_layout = render_device.create_bind_group_layout(
             "clear_layout",
@@ -370,6 +377,33 @@ impl FromWorld for ResetPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     sampler(SamplerBindingType::Filtering),
                     uniform_buffer::<SplatUniform>(false),
+                ),
+            ),
+        );
+        let advection_layout = render_device.create_bind_group_layout(
+            "advection_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
+                    uniform_buffer::<AdvectionUniform>(false),
+                ),
+            ),
+        );
+        let divergencen_layout = render_device.create_bind_group_layout(
+            "divergencen_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    sampler(SamplerBindingType::Filtering),
                 ),
             ),
         );
@@ -503,12 +537,12 @@ impl FromWorld for ResetPipeline {
                 multisample: MultisampleState::default(),
                 push_constant_ranges: vec![],
             });
-        let init_splat_pipeline = world
+        let init_advection_pipeline = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue it's creation
             .queue_render_pipeline(RenderPipelineDescriptor {
-                label: Some("splat_pipeline".into()),
-                layout: vec![base_vertex_layout.clone(),splat_layout.clone()],
+                label: Some("init_advection_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),advection_layout.clone()],
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: VertexState {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
@@ -517,7 +551,40 @@ impl FromWorld for ResetPipeline {
                     buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
-                    shader: splat_out_shader.clone(),
+                    shader: advection_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
+
+        let init_divergence_pipeline = world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_divergence_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),divergencen_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: divergence_shader.clone(),
                     shader_defs: vec![],
                     // Make sure this matches the entry point of your shader.
                     // It can be anything as long as it matches here and in the shader.
@@ -541,7 +608,8 @@ impl FromWorld for ResetPipeline {
             init_display_pipeline,
             init_velocity_out_pipeline,
             init_splat_pipeline,
-            init_splat_pipeline,
+            init_advection_pipeline,
+            init_divergence_pipeline,
 
 
         }
