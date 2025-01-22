@@ -2,7 +2,7 @@ use std::num::NonZeroU64;
 use bevy::core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state;
 use bevy::prelude::*;
 use bevy::render::extract_component::ExtractComponent;
-use bevy::render::render_resource::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, Extent3d, FragmentState, MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, SamplerBindingType, ShaderStage, ShaderStages, ShaderType, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexState};
+use bevy::render::render_resource::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, Extent3d, FragmentState, MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, SamplerBindingType, ShaderStage, ShaderStages, ShaderType, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::renderer::RenderDevice;
 use bevy::render::texture::BevyDefault;
@@ -259,6 +259,7 @@ struct ResetPipeline {
     init_vorticity_pipeline: CachedRenderPipelineId,
     init_pressure_pipeline: CachedRenderPipelineId,
     init_gradient_subtract_pipeline: CachedRenderPipelineId,
+    init_sand_subtract_pipeline: CachedRenderPipelineId,
 }
 impl FromWorld for ResetPipeline {
     fn from_world(world: &mut World) -> Self {
@@ -501,7 +502,14 @@ impl FromWorld for ResetPipeline {
                 ),
             ),
         );
-
+        let formats = vec![
+            // Position
+            VertexFormat::Float32x2,
+            // Color
+            VertexFormat::Float32x2,
+        ];
+        let vertex_layout =
+            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);
         let init_reset_pipeline = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue it's creation
@@ -513,7 +521,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: clear_shader.clone(),
@@ -546,7 +554,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: display_shader.clone(),
@@ -579,7 +587,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: velocity_out_shader.clone(),
@@ -611,7 +619,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: splat_out_shader.clone(),
@@ -643,7 +651,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: advection_shader.clone(),
@@ -676,7 +684,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: divergence_shader.clone(),
@@ -709,7 +717,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: curl_shader.clone(),
@@ -742,7 +750,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: pressure_shader.clone(),
@@ -776,7 +784,7 @@ impl FromWorld for ResetPipeline {
                     shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
                     shader: gradient_subtract_shader.clone(),
@@ -822,6 +830,22 @@ impl FromWorld for ResetPipeline {
                 ),
             ),
         );
+
+        let sand_shader = world
+            .resource::<AssetServer>()
+            .load("sand.wgsl");
+
+        let sand_vertex_shader = world
+            .resource::<AssetServer>()
+            .load("sandVertex.wgsl");
+
+
+        let sand_buffer_layout =
+            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, vec![
+                // Position
+                VertexFormat::Float32x2,
+            ]);
+
         let init_sand_subtract_pipeline = world
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue it's creation
@@ -830,13 +854,13 @@ impl FromWorld for ResetPipeline {
                 layout: vec![sand_vertex_layout.clone(),sand_layout.clone()],
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: VertexState {
-                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader: sand_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
                     shader_defs: vec![],
                     entry_point: "main".into(),  // 顶点着色器的入口点
-                    buffers: Vec::new(),  // 没有顶点数据，因此缓冲区为空
+                    buffers: vec![sand_buffer_layout],  // 没有顶点数据，因此缓冲区为空
                 },
                 fragment: Some(FragmentState {
-                    shader: gradient_subtract_shader.clone(),
+                    shader: sand_shader.clone(),
                     shader_defs: vec![],
                     // Make sure this matches the entry point of your shader.
                     // It can be anything as long as it matches here and in the shader.
@@ -864,6 +888,7 @@ impl FromWorld for ResetPipeline {
             init_advection_pipeline,
             init_divergence_pipeline,
             init_curl_pipeline,
+            init_vorticity_pipeline,
             init_pressure_pipeline,
             init_gradient_subtract_pipeline,
             init_sand_subtract_pipeline

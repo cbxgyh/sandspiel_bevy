@@ -1,6 +1,6 @@
-@group(0) @binding(0) var uTexture: texture_2d<f32>;
-@group(0) @binding(1) var uWind: texture_2d<f32>;
-@group(0) @binding(2) var<uniform> value: ClearUniform;
+@group(1) @binding(0) var uTexture: texture_2d<f32>;
+@group(1) @binding(1) var uWind: texture_2d<f32>;
+@group(1) @binding(2) var<uniform> value: ClearUniform;
 
 struct ClearUniform{
     value: f32,

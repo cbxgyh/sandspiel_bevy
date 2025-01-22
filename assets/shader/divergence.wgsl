@@ -1,5 +1,5 @@
-@group(0) @binding(0) var uVelocity: texture_2d<f32>;
-@group(0) @binding(1) var uSampler: sampler;
+@group(1) @binding(0) var uVelocity: texture_2d<f32>;
+@group(1) @binding(1) var uSampler: sampler;
 
 struct VertexOutput {
     @location(0) vUv: vec2<f32>;
