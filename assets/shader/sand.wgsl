@@ -1,5 +1,5 @@
-@group(0) @binding(0) var data: texture_2d<f32>;
-@group(0) @binding(1) var backBuffer: texture_2d<f32>;
+@group(1) @binding(0) var data: texture_2d<f32>;
+@group(1) @binding(1) var backBuffer: texture_2d<f32>;
 
 
 

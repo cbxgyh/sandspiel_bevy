@@ -1,6 +1,6 @@
-@group(0) @binding(0) var uVelocity: texture_2d<f32>;
-@group(0) @binding(1) var uCurl: texture_2d<f32>;
-@group(0) @binding(2) var<uniform> value: VorticityUniform;
+@group(1) @binding(0) var uVelocity: texture_2d<f32>;
+@group(1) @binding(1) var uCurl: texture_2d<f32>;
+@group(1) @binding(2) var<uniform> value: VorticityUniform;
 
 struct VorticityUniform{
     curl: f32,

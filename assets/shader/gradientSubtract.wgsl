@@ -1,7 +1,7 @@
-@group(0) @binding(0) var uPressure: texture_2d<f32>;
-@group(0) @binding(1) var uVelocity: texture_2d<f32>;
-@group(0) @binding(2) var uWind: texture_2d<f32>;
-@group(0) @binding(3) var uCells: texture_2d<f32>;
+@group(1) @binding(0) var uPressure: texture_2d<f32>;
+@group(1) @binding(1) var uVelocity: texture_2d<f32>;
+@group(1) @binding(2) var uWind: texture_2d<f32>;
+@group(1) @binding(3) var uCells: texture_2d<f32>;
 
 // 边界处理函数，确保纹理坐标在 [0.0, 1.0] 范围内
 fn boundary(uv: vec2<f32>) -> vec2<f32> {
