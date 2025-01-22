@@ -1,5 +1,5 @@
-@group(0) @binding(0) var uVelocity: texture_2d<f32>;
-
+@group(1) @binding(0) var uVelocity: texture_2d<f32>;
+@group(1) @binding(1) var uSampler: sampler;
 @fragment
 fn main(
     @location(0) vUv: vec2<f32>,
@@ -9,10 +9,10 @@ fn main(
     @location(4) vB: vec2<f32>
 ) -> @location(0) vec4<f32> {
     // 从 uVelocity 纹理中采样相应纹理坐标处的速度分量
-    let L: f32 = textureSample(uVelocity, sampler(uVelocity), vL).y;
-    let R: f32 = textureSample(uVelocity, sampler(uVelocity), vR).y;
-    let T: f32 = textureSample(uVelocity, sampler(uVelocity), vT).x;
-    let B: f32 = textureSample(uVelocity, sampler(uVelocity), vB).x;
+    let L: f32 = textureSample(uVelocity, uSampler, vL).y;
+    let R: f32 = textureSample(uVelocity, uSampler, vR).y;
+    let T: f32 = textureSample(uVelocity, uSampler, vT).x;
+    let B: f32 = textureSample(uVelocity, uSampler, vB).x;
 
     // 计算涡度
     let vorticity: f32 = R - L - T + B;

@@ -7,11 +7,11 @@ struct SplatUniform{
    point: vec2<f32>,
    radius: f32
 }
-@group(0) @binding(3) var<uniform> splat_value: SplatUniform;
+@group(1) @binding(2) var<uniform> splat_value: SplatUniform;
 
 
 struct VertexOutput {
-    @location(0) vUv: vec2<f32>;
+    @location(0) vUv: vec2<f32>
 };
 
 @fragment

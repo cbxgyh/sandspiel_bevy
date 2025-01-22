@@ -2,10 +2,10 @@
 @group(1) @binding(1) var uVelocity: texture_2d<f32>;
 @group(1) @binding(2) var uWind: texture_2d<f32>;
 @group(1) @binding(3) var uCells: texture_2d<f32>;
-
+@group(1) @binding(4) var uSampler: sampler;
 // 边界处理函数，确保纹理坐标在 [0.0, 1.0] 范围内
 fn boundary(uv: vec2<f32>) -> vec2<f32> {
-    return clamp(uv, 0.0, 1.0);
+    return clamp(uv, vec2<f32>(0.0), vec2<f32>(1.0));
 }
 
 @fragment
@@ -17,20 +17,20 @@ fn main(
     @location(4) vB: vec2<f32>
 ) -> @location(0) vec4<f32> {
     // 对纹理坐标进行边界处理并采样压力
-    let L: f32 = textureSample(uPressure, sampler(uPressure), boundary(vL)).x;
-    let R: f32 = textureSample(uPressure, sampler(uPressure), boundary(vR)).x;
-    let T: f32 = textureSample(uPressure, boundary(vT)).x;
-    let B: f32 = textureSample(uPressure, boundary(vB)).x;
+    let L: f32 = textureSample(uPressure, uSampler, boundary(vL)).x;
+    let R: f32 = textureSample(uPressure, uSampler, boundary(vR)).x;
+    let T: f32 = textureSample(uPressure, uSampler,  boundary(vT)).x;
+    let B: f32 = textureSample(uPressure, uSampler, boundary(vB)).x;
 
     // 采样速度、风场和单元信息
-    let velocity: vec2<f32> = textureSample(uVelocity, sampler(uVelocity), vUv).xy;
-    let wind: vec2<f32> = textureSample(uWind, sampler(uWind), vUv).xy;
-    let cell: vec2<f32> = textureSample(uCells, sampler(uCells), vUv).xy;
+    var velocity: vec2<f32> = textureSample(uVelocity, uSampler, vUv).xy;
+    let wind: vec2<f32> = textureSample(uWind, uSampler, vUv).xy;
+    let cell: vec2<f32> = textureSample(uCells, uSampler, vUv).xy;
 
     // 速度更新
     velocity = velocity - vec2<f32>(R - L, T - B);
-    velocity.yx = velocity.yx + wind * -25.0;
-
+    velocity = velocity.yx + wind * -25.0;
+//    velocity = vec2(velocity.x, velocity.y + wind * -25.0);
     // 类型判断和速度调整
     let type_val: i32 = i32((cell.r * 255.0) + 0.1);
     if (type_val == 1 || type_val == 5) {

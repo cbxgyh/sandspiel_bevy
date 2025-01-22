@@ -1,15 +1,19 @@
 @group(1) @binding(0) var data: texture_2d<f32>;
 @group(1) @binding(1) var backBuffer: texture_2d<f32>;
-
+@group(1) @binding(2) var uSampler: sampler;
 
 
 struct SandUniform{
+    isSnapshot: u32,
     t: f32,
     dpi: f32,
     resolution: vec2<f32>,
-    isSnapshot: bool
+
 }
-@group(0) @binding(2) var<uniform> value: SandUniform;
+@group(1) @binding(3) var<uniform> value: SandUniform;
+fn mod1(a: f32, b: f32) -> f32 {
+    return a - b * floor(a / b);
+}
 
 // 假设我们有以下 GLSL 库函数的 WGSL 实现，这里仅为示例，可能需要更复杂的实现
 // 你可能需要找到相应的 WGSL 库或自行实现这些函数
@@ -17,7 +21,7 @@ fn hsv2rgb(hsv: vec3<f32>) -> vec3<f32> {
     // 实现 hsv 到 rgb 的转换
     // 示例实现，可能不准确
     let c = hsv.z * hsv.y;
-    let x = c * (1.0 - abs(mod(hsv.x * 6.0, 2.0) - 1.0));
+    let x = c * (1.0 - abs(mod1(hsv.x * 6.0, 2.0) - 1.0));
     let m = hsv.z - c;
     if (hsv.x < 1.0 / 6.0) {
         return vec3<f32>(c + m, x + m, m);
@@ -56,12 +60,12 @@ fn random(p: vec2<f32>) -> f32 {
 @fragment
 fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let textCoord: vec2<f32> = ((uv * vec2<f32>(0.5, -0.5)) + vec2<f32>(0.5)).yx;
-    let data: vec4<f32> = textureSample(data, sampler(data), textCoord);
+    let data: vec4<f32> = textureSample(data, uSampler, textCoord);
     let type_val: i32 = i32((data.r * 255.0) + 0.1);
     var hue: f32 = 0.0;
     var saturation: f32 = 0.6;
     var lightness: f32 = 0.3 + data.g * 0.5;
-    let noise: f32 = snoise3(vec3<f32>(floor(uv * value.resolution / value.dpi), value.t * 0.05));
+    let noise: f32 = snoise3(vec3<f32>(floor(uv * value.resolution / value.dpi), value.t * 0.05),1.0);
     var a: f32 = 1.0;
 
 
@@ -70,7 +74,7 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         saturation = 0.1;
         lightness = 0.1;
         a = 0.1;
-        if (value.isSnapshot) {
+        if (value.isSnapshot==1) {
             saturation = 0.05;
             lightness = 1.01;
             a = 1.0;
@@ -86,7 +90,7 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     } else if (type_val == 3) { // water
         hue = 0.6;
         lightness = 0.7 + data.g * 0.25 + noise * 0.1;
-        let polarity: i32 = i32(mod(data.g * 255.0, 2.0) + 0.1);
+        let polarity: i32 = i32(mod1(data.g * 255.0, 2.0) + 0.1);
         if (polarity == 0) {
             lightness += 0.01;
         }
@@ -101,7 +105,7 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         hue = (data.g * 0.1);
         saturation = 0.7;
         lightness = 0.7 + (data.g * 0.3) + ((noise + 0.8) * 0.5);
-        if (value.isSnapshot) {
+        if (value.isSnapshot==1) {
             lightness -= 0.2;
         }
     } else if (type_val == 7) { // wood
@@ -158,7 +162,7 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     }
 
 
-    if (value.isSnapshot == false) {
+    if (value.isSnapshot == 0) {
         lightness *= (0.975 + snoise2(floor(uv * value.resolution / value.dpi)) * 0.025);
     }
 

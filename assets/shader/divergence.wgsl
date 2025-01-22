@@ -2,11 +2,11 @@
 @group(1) @binding(1) var uSampler: sampler;
 
 struct VertexOutput {
-    @location(0) vUv: vec2<f32>;
-    @location(1) vL: vec2<f32>;
-    @location(2) vR: vec2<f32>;
-    @location(3) vT: vec2<f32>;
-    @location(4) vB: vec2<f32>;
+    @location(0) vUv: vec2<f32>,
+    @location(1) vL: vec2<f32>,
+    @location(2) vR: vec2<f32>,
+    @location(3) vT: vec2<f32>,
+    @location(4) vB: vec2<f32>,
 };
 
 fn sampleVelocity(uv: vec2<f32>) -> vec2<f32> {

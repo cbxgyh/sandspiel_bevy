@@ -10,7 +10,7 @@ struct AdvectionUniform {
     dissipation : f32
 };
 struct VertexOutput {
-    @location(0) vUv : vec2<f32>;
+    @location(0) vUv : vec2<f32>
 };
 
 

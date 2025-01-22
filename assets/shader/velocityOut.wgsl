@@ -4,7 +4,7 @@
 @group(1) @binding(3) var uSamplerPressure: sampler;
 
 struct VertexOutput {
-    @location(0) vUv: vec2<f32>;
+    @location(0) vUv: vec2<f32>
 };
 
 @fragment
