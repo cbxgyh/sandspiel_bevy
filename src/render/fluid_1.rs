@@ -6,7 +6,6 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::window::PrimaryWindow;
-use bevy_egui::{EguiContext, EguiPlugin};
 
 
 // 流体组件
@@ -64,10 +63,10 @@ fn main() {
             curl: 15.0,
             splat_radius: 0.005,
         })
-        .add_startup_system(setup)
-        .add_system(update_system)
-        .add_system(event_handler_system)
-        .add_system(gui_system)
+        // .add_systems(setup)
+        // .add_system(update_system)
+        // // .add_system(event_handler_system)
+        // .add_system(gui_system)
         .run();
 }
 
@@ -262,10 +261,10 @@ fn splat(
             for j in (y - radius)..=(y + radius) {
                 if i < density_image.width() && j < density_image.height() {
                     let index = (j * density_image.width() + i) * 4;
-                    density_image.data[index] = (color.r() * 255.0) as u8;
-                    density_image.data[index + 1] = (color.g() * 255.0) as u8;
-                    density_image.data[index + 2] = (color.b() * 255.0) as u8;
-                    density_image.data[index + 3] = 255;
+                    density_image.data[index as usize] = (color.r() * 255.0) as u8;
+                    density_image.data[index as usize + 1 ] = (color.g() * 255.0) as u8;
+                    density_image.data[index as usize + 2] = (color.b() * 255.0) as u8;
+                    density_image.data[index as usize+ 3] = 255;
                 }
             }
         }
@@ -282,10 +281,10 @@ fn splat(
             for j in (y - radius)..=(y + radius) {
                 if i < velocity_image.width() && j < velocity_image.height() {
                     let index = (j * velocity_image.width() + i) * 4;
-                    velocity_image.data[index] = (velocity.x * 255.0) as u8;
-                    velocity_image.data[index + 1] = (velocity.y * 255.0) as u8;
-                    velocity_image.data[index + 2] = 0;
-                    velocity_image.data[index + 3] = 255;
+                    velocity_image.data[index as usize] = (velocity.x * 255.0) as u8;
+                    velocity_image.data[index as usize+ 1] = (velocity.y * 255.0) as u8;
+                    velocity_image.data[index as usize+ 2] = 0;
+                    velocity_image.data[index as usize+ 3] = 255;
                 }
             }
         }
@@ -293,102 +292,103 @@ fn splat(
 }
 
 
-fn event_handler_system(
-    mut pointer_query: Query<&mut PointerComponent>,
-    mut mouse_button_input: ResMut<ButtonInput<MouseButton>>,
-    mut touch_input: ResMut<ButtonInput<TouchInput>>,
-    primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
-) {
-    let mut pointer = pointer_query.single_mut();
-
-
-    // 获取窗口尺寸
-    let window = primary_window.get_primary().unwrap();
-
-
-    // 处理鼠标事件
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        pointer.down = true;
-    } else if mouse_button_input.just_released(MouseButton::Left) {
-        pointer.down = false;
-    }
-
-
-    // 处理触摸事件
-    for touch in touch_input.get_just_pressed() {
-        pointer.down = true;
-        pointer.id = touch.id;
-    }
-    for touch in touch_input.get_just_released() {
-        if pointer.id == touch.id {
-            pointer.down = false;
-        }
-    }
-
-
-    // 处理鼠标和触摸的移动事件
-    if pointer.down {
-        if let Some(position) = window.cursor_position() {
-            let prev_position = pointer.position;
-            pointer.position = position;
-            pointer.velocity = position - prev_position;
-            pointer.moved = true;
-        }
-    }
-}
+// fn event_handler_system(
+//     mut pointer_query: Query<&mut PointerComponent>,
+//     mut mouse_button_input: EventReader<ButtonInput<MouseButton>>,
+//     mut touch_input: EventReader<ButtonInput<TouchInput>>,
+//     primary_window: Query<(Entity, &Window), With<PrimaryWindow>>,
+// )
+// {
+//     let mut pointer = pointer_query.single_mut();
+//
+//
+//     // 获取窗口尺寸
+//     let window = primary_window.get_primary().unwrap();
+//
+//
+//     // 处理鼠标事件
+//     if mouse_button_input.just_pressed(MouseButton::Left) {
+//         pointer.down = true;
+//     } else if mouse_button_input.just_released(MouseButton::Left) {
+//         pointer.down = false;
+//     }
+//
+//
+//     // 处理触摸事件
+//     for touch in touch_input.get_just_pressed() {
+//         pointer.down = true;
+//         pointer.id = touch.id;
+//     }
+//     for touch in touch_input.get_just_released() {
+//         if pointer.id == touch.id {
+//             pointer.down = false;
+//         }
+//     }
+//
+//
+//     // 处理鼠标和触摸的移动事件
+//     if pointer.down {
+//         if let Some(position) = window.cursor_position() {
+//             let prev_position = pointer.position;
+//             pointer.position = position;
+//             pointer.velocity = position - prev_position;
+//             pointer.moved = true;
+//         }
+//     }
+// }
 
 
 fn gui_system(
-    mut egui_context: ResMut<EguiContext>,
+    // mut egui_context: ResMut<EguiContext>,
     mut config: ResMut<FluidConfig>,
 ) {
-    egui::Window::new("Fluid Settings")
-        .show(egui_context.ctx_mut(), |ui| {
-            ui.add(
-                egui::Slider::new(
-                    &mut config.texture_downsample,
-                    0..=2,
-                )
-                    .text("Texture Downsample"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.density_dissipation,
-                    0.9..=1.0,
-                )
-                    .text("Density Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.velocity_dissipation,
-                    0.9..=1.0,
-                )
-                    .text("Velocity Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.pressure_dissipation,
-                    0.0..=1.0,
-                )
-                    .text("Pressure Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.pressure_iterations,
-                    1..=60,
-                )
-                    .text("Pressure Iterations"),
-            );
-            ui.add(
-                egui::Slider::new(&mut config.curl, 0.0..=50.0)
-                    .text("Curl"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.splat_radius,
-                    0.0001..=0.01,
-                )
-                    .text("Splat Radius"),
-            );
-        });
+    // egui::Window::new("Fluid Settings")
+    //     .show(egui_context.ctx_mut(), |ui| {
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.texture_downsample,
+    //                 0..=2,
+    //             )
+    //                 .text("Texture Downsample"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.density_dissipation,
+    //                 0.9..=1.0,
+    //             )
+    //                 .text("Density Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.velocity_dissipation,
+    //                 0.9..=1.0,
+    //             )
+    //                 .text("Velocity Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.pressure_dissipation,
+    //                 0.0..=1.0,
+    //             )
+    //                 .text("Pressure Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.pressure_iterations,
+    //                 1..=60,
+    //             )
+    //                 .text("Pressure Iterations"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(&mut config.curl, 0.0..=50.0)
+    //                 .text("Curl"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.splat_radius,
+    //                 0.0001..=0.01,
+    //             )
+    //                 .text("Splat Radius"),
+    //         );
+    //     });
 }
