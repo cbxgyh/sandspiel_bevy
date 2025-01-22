@@ -1,7 +1,7 @@
-@group(0) @binding(0) var uTexture: texture_2d<f32>;
-@group(0) @binding(1) var uPressure: texture_2d<f32>;
-@group(0) @binding(2) var uSamplerTexture: sampler;
-@group(0) @binding(3) var uSamplerPressure: sampler;
+@group(1) @binding(0) var uTexture: texture_2d<f32>;
+@group(1) @binding(1) var uPressure: texture_2d<f32>;
+@group(1) @binding(2) var uSamplerTexture: sampler;
+@group(1) @binding(3) var uSamplerPressure: sampler;
 
 struct VertexOutput {
     @location(0) vUv: vec2<f32>;

@@ -1,9 +1,9 @@
-@group(0) @binding(0) var uVelocity : texture_2d<f32>;
-@group(0) @binding(1) var uSource : texture_2d<f32>;
-@group(0) @binding(2) var uWind : texture_2d<f32>;
-@group(0) @binding(3) var uSampler : sampler;
+@group(1) @binding(0) var uVelocity : texture_2d<f32>;
+@group(1) @binding(1) var uSource : texture_2d<f32>;
+@group(1) @binding(2) var uWind : texture_2d<f32>;
+@group(1) @binding(3) var uSampler : sampler;
 
-@group(0) @binding(4) var<uniform> advection_value: AdvectionUniform;
+@group(1) @binding(4) var<uniform> advection_value: AdvectionUniform;
 struct AdvectionUniform {
     texel_size : vec2<f32>,
     dt : f32,
