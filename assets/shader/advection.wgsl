@@ -17,14 +17,14 @@ struct VertexOutput {
 @fragment
 fn main(input : VertexOutput) -> @location(0) vec4<f32> {
     // 坐标计算
-    var coord = input.vUv - dt * textureSample(uVelocity, uSampler, input.vUv).xy * texelSize;
+    var coord = input.vUv - advection_value.dt * textureSample(uVelocity, uSampler, input.vUv).xy * advection_value.texel_size;
     // 密度计算
     var density = textureSample(uWind, uSampler, input.vUv).w * 1.0;
     if (density > 0.99) {
         density = 0.0;
     }
     var newSource = textureSample(uSource, uSampler, coord);
-    var result = dissipation * (newSource + vec4<f32>(density));
+    var result = advection_value.dissipation * (newSource + vec4<f32>(density));
     result.a = 1.0;
     return result;
 }
