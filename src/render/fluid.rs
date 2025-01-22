@@ -1,4 +1,5 @@
 use std::num::NonZeroU64;
+use bevy::core::{Pod, Zeroable};
 use bevy::core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state;
 use bevy::prelude::*;
 use bevy::render::extract_component::ExtractComponent;
@@ -217,28 +218,28 @@ fn create_texture(mut textures: ResMut<Assets<Texture>>,
     }))
 
 }
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct ClearUniform {
     value: f32,
 }
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct VertexInput {
     position : Vec2
 }
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct SplatUniform {
     aspect_ratio: f32,
     color: Vec3,
     point: Vec2,
     radius: f32
 }
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct AdvectionUniform {
     texel_size : Vec2,
     dt : f32,
     dissipation : f32
 }
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct SandUniform {
     t: f32,
     dpi: f32,
