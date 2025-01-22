@@ -3,9 +3,10 @@ use bevy::core::{Pod, Zeroable};
 use bevy::core_pipeline::fullscreen_vertex_shader::fullscreen_shader_vertex_state;
 use bevy::prelude::*;
 use bevy::render::extract_component::ExtractComponent;
-use bevy::render::render_resource::{BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, Extent3d, FragmentState, MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, SamplerBindingType, ShaderStage, ShaderStages, ShaderType, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
+use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType, BufferInitDescriptor, BufferSize, BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites, Extent3d, FragmentState, MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, SamplerBindingType, ShaderStage, ShaderStages, ShaderType, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
-use bevy::render::renderer::RenderDevice;
+use bevy::render::render_resource::BindingResource::Sampler;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::render::texture::BevyDefault;
 use crate::render::load_shader::LoadFont;
 struct FluidPlugin;
@@ -84,9 +85,10 @@ struct FluidTextures {
 }
 
 fn setup(
-        mut commands: Commands,
-        asset_server: &mut ResMut<Assets<Texture>,
-            load_font:Res<LoadFont>
+    mut commands: Commands,
+    mut asset_server:ResMut<Assets<Texture>>,
+    load_font:Res<LoadFont>,
+    render_device:ResMut<RenderDevice>
 ) {
     commands.insert_resource(FluidConfig {
         texture_downsample: 0.0,
@@ -101,17 +103,17 @@ fn setup(
     setup_gui(&mut commands,load_font);
 
     // 创建和加载帧缓冲区纹理
-    let velocity_texture = create_texture(&mut asset_server, 512, 512, TextureFormat::Rgba16Float);
-    let density_texture = create_texture(&asset_server, 512, 512, TextureFormat::Rgba16Float);
+    let velocity_texture = create_texture(&asset_server, 512, 512, TextureFormat::Rgba16Float,&render_device);
+    let density_texture = create_texture(&asset_server, 512, 512, TextureFormat::Rgba16Float,&render_device);
 
     commands.insert_resource(FluidTextures {
         velocity: velocity_texture,
         density: density_texture,
-        divergence: create_texture(&asset_server, 512, 512, TextureFormat::R16Float),
-        curl: create_texture(&asset_server, 512, 512, TextureFormat::R16Float),
-        pressure: create_texture(&asset_server, 512, 512, TextureFormat::R16Float),
-        burns: create_texture(&asset_server, 512, 512, TextureFormat::Rgba8Unorm),
-        cells: create_texture(&asset_server, 512, 512, TextureFormat::Rgba8Unorm),
+        divergence: create_texture(&asset_server, 512, 512, TextureFormat::R16Float,&render_device),
+        curl: create_texture(&asset_server, 512, 512, TextureFormat::R16Float,&render_device),
+        pressure: create_texture(&asset_server, 512, 512, TextureFormat::R16Float,&render_device),
+        burns: create_texture(&asset_server, 512, 512, TextureFormat::Rgba8Unorm,&render_device),
+        cells: create_texture(&asset_server, 512, 512, TextureFormat::Rgba8Unorm,&render_device),
     });
 }
 fn setup_gui(commands: &mut Commands,load_font:Res<LoadFont>) {
@@ -196,10 +198,10 @@ fn handle_pointer_input(
 
 }
 
-fn create_texture(mut textures: ResMut<Assets<Texture>>,
+fn create_texture(mut textures:&ResMut<Assets<Texture>>,
                   width: u32, height: u32,
                   format: TextureFormat,
-                  render_device:RenderDevice,
+                  render_device:&ResMut<RenderDevice>,
 ) -> Handle<Texture> {
     textures.add(render_device.create_texture(&TextureDescriptor {
         label: None,
@@ -212,7 +214,9 @@ fn create_texture(mut textures: ResMut<Assets<Texture>>,
         sample_count: 1,
         dimension: TextureDimension::D2,
         format: format,  // 纹理格式
-        usage: TextureUsages::COPY_DST,  // 纹理的使用方式，采样和复制目标
+        usage: TextureUsages::TEXTURE_BINDING
+            | TextureUsages::COPY_DST
+            | TextureUsages::RENDER_ATTACHMENT,  // 纹理的使用方式，采样和复制目标
         view_formats: &[],   // 视图格式（通常不需要设置）
         ..Default::default()
     }))
@@ -240,6 +244,11 @@ struct AdvectionUniform {
     dissipation : f32
 }
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
+struct VorticityUniform{
+    curl: f32,
+    dt: f32
+}
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct SandUniform {
     t: f32,
     dpi: f32,
@@ -250,6 +259,16 @@ struct SandUniform {
 #[derive(Resource)]
 struct ResetPipeline {
     reset_bind_group_layout: BindGroupLayout,
+    display_bind_group_layout: BindGroupLayout,
+    velocity_out_bind_group_layout: BindGroupLayout,
+    splat_bind_group_layout: BindGroupLayout,
+    advection_bind_group_layout: BindGroupLayout,
+    divergence_bind_group_layout: BindGroupLayout,
+    curl_bind_group_layout: BindGroupLayout,
+    vorticity_bind_group_layout: BindGroupLayout,
+    pressure_bind_group_layout: BindGroupLayout,
+    gradient_subtract_bind_group_layout: BindGroupLayout,
+    sand_bind_group_layout: BindGroupLayout,
     init_reset_pipeline: CachedRenderPipelineId,
     init_display_pipeline: CachedRenderPipelineId,
     init_velocity_out_pipeline: CachedRenderPipelineId,
@@ -335,7 +354,9 @@ impl FromWorld for ResetPipeline {
         let curl_shader = world
             .resource::<AssetServer>()
             .load("curl.wgsl");
-
+        let vorticity_shader = world
+            .resource::<AssetServer>()
+            .load("vorticity.wgsl");
         let pressure_shader = world
             .resource::<AssetServer>()
             .load("pressure.wgsl");
@@ -475,7 +496,19 @@ impl FromWorld for ResetPipeline {
                 ),
             ),
         );
-
+        let vorticity_layout = render_device.create_bind_group_layout(
+            "vorticity_layout",
+            &BindGroupLayoutEntries::sequential(
+                // The layout entries will only be visible in the fragment stage
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture,
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    uniform_buffer::<VorticityUniform>(false),
+                ),
+            ),
+        );
         let pressure_layout = render_device.create_bind_group_layout(
             "pressure_layout",
             &BindGroupLayoutEntries::sequential(
@@ -739,6 +772,38 @@ impl FromWorld for ResetPipeline {
                 multisample: MultisampleState::default(),
                 push_constant_ranges: vec![],
             });
+        let init_vorticity_pipeline= world
+            .resource_mut::<PipelineCache>()
+            // This will add the pipeline to the cache and queue it's creation
+            .queue_render_pipeline(RenderPipelineDescriptor {
+                label: Some("init_vorticity_pipeline".into()),
+                layout: vec![base_vertex_layout.clone(),vorticity_layout.clone()],
+                // This will setup a fullscreen triangle for the vertex state
+                vertex: VertexState {
+                    shader: base_vertex_shader.clone(),  // 传递片段着色器作为顶点着色器
+                    shader_defs: vec![],
+                    entry_point: "main".into(),  // 顶点着色器的入口点
+                    buffers: vec![vertex_layout],  // 没有顶点数据，因此缓冲区为空
+                },
+                fragment: Some(FragmentState {
+                    shader: vorticity_shader.clone(),
+                    shader_defs: vec![],
+                    // Make sure this matches the entry point of your shader.
+                    // It can be anything as long as it matches here and in the shader.
+                    entry_point: "main".into(),
+                    targets: vec![Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: None,
+                        write_mask: ColorWrites::ALL,
+                    })],
+                }),
+                // All of the following properties are not important for this effect so just use the default values.
+                // This struct doesn't have the Default trait implemented because not all field can have a default value.
+                primitive: PrimitiveState::default(),
+                depth_stencil: None,
+                multisample: MultisampleState::default(),
+                push_constant_ranges: vec![],
+            });
 
         let init_pressure_pipeline = world
             .resource_mut::<PipelineCache>()
@@ -882,6 +947,16 @@ impl FromWorld for ResetPipeline {
 
         ResetPipeline {
             reset_bind_group_layout: layout,
+            display_bind_group_layout: display_layout,
+            velocity_out_bind_group_layout: velocity_out_layout,
+            splat_bind_group_layout: splat_layout,
+            advection_bind_group_layout: advection_layout,
+            divergence_bind_group_layout: divergencen_layout,
+            curl_bind_group_layout: curl_layout,
+            vorticity_bind_group_layout: vorticity_layout,
+            pressure_bind_group_layout: pressure_layout,
+            gradient_subtract_bind_group_layout:gradient_subtract_layout,
+            sand_bind_group_layout: sand_layout,
             init_reset_pipeline,
             init_display_pipeline,
             init_velocity_out_pipeline,
@@ -895,17 +970,6 @@ impl FromWorld for ResetPipeline {
             init_sand_subtract_pipeline
 
         }
-    }
-}
-#[derive(Resource)]
-struct DisplayPipeline {
-    display_bind_group_layout: BindGroupLayout,
-    init_display_pipeline: CachedRenderPipelineId,
-}
-impl FromWorld for crate::render::fluid::ResetPipeline {
-    fn from_world(world: &mut World) -> Self {
-
-
     }
 }
 
@@ -973,10 +1037,10 @@ fn reset(
         ..Default::default()
     };
     let value_data: [f32; 1] = [0.0]; // 默认值
-    let value_buffer = render_device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let value_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
         label: Some("Value Buffer"),
         contents: bytemuck::cast_slice(&value_data),
-        usage: wgpu::BufferUsages::UNIFORM,
+        usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
     });
     let x=render_device.create_bind_group(
             Some("Burns Bind Group"),
@@ -984,42 +1048,23 @@ fn reset(
             &[
                 BindGroupEntry {
                     binding:0,
-                    resource: BindingResource::TextureView(fluid_textures.divergence),
+                    resource: BindingResource::TextureView(fluid_textures.burns.clone().into()),
                 },
                 BindGroupEntry {
                     binding:1,
-                    resource: BindingResource::TextureView(fluid_textures.divergence),
+                    resource: BindingResource::TextureView(fluid_textures.density.clone().into()),
                 },
                 BindGroupEntry {
                     binding: 2, // 绑定点 2
                     resource: BindingResource::Buffer(BufferBinding {
-                        buffer: value_buffer, // 指向存储 uniform 的缓冲区
+                        buffer: &value_buffer, // 指向存储 uniform 的缓冲区
                         offset: 0,            // 偏移量，通常是 0
-                        size: None,           // 绑定整个缓冲区
+                        size: Some(),           // 绑定整个缓冲区
                     }),
                 },
             ]
 
     );
-    let burns_bind_group = BindGroupDescriptor {
-        label: Some("Burns Bind Group"),
-        entries: vec![
-            // Example binding for the burns texture
-            BindGroupEntry {
-                binding: 0,
-                resource: burns_texture.view().into(),
-            },
-            // Add more bindings for other textures...
-        ],
-        ..Default::default()
-    };
-
-    // Example: reset the burns texture
-    commands.spawn((
-        burns_texture.clone(),
-        burns_bind_group,
-        pipeline,
-    ));
 
     // Repeat the same for density, pressure, and other textures...
 }
@@ -1031,8 +1076,9 @@ fn update(
     fluid_state: Res<FluidState>,
     config: Res<FluidConfig>,
     mut commands: Commands,
-    device: Res<wgpu::Device>,
-    queue: Res<wgpu::Queue>,
+    device: Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+    reset_pipeline: Res<ResetPipeline>,
 ) {
     // 时间差，用于控制每一帧的时间步长
     let dt = time.delta_seconds();
@@ -1048,60 +1094,75 @@ fn update(
 
     // 1. Advection - 速度和密度平流
     let advection_shader = Shader::from_wgsl(include_str!("advection.wgsl"));
-    let advection_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-        vertex: ShaderStage::from(advection_shader.clone()),
-        fragment: Some(ShaderStage::from(advection_shader)),
-        layout: Some(vec![
-            // 绑定的 Layout: 用于绑定纹理和其他数据
-            BindGroupLayoutEntry {
+    // let advection_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+    //     vertex: ShaderStage::from(advection_shader.clone()),
+    //     fragment: Some(ShaderStage::from(advection_shader)),
+    //     layout: vec![
+    //         // 绑定的 Layout: 用于绑定纹理和其他数据
+    //         // BindGroupLayoutEntry {
+    //         //     binding: 0,
+    //         //     visibility: ShaderStages::FRAGMENT,
+    //         //     ty: BindingType::Texture {
+    //         //         sample_type: TextureSampleType::Float,
+    //         //         view_dimension: TextureViewDimension::D2,
+    //         //         multisampled: false,
+    //         //     },
+    //         //     count: None,
+    //         // },
+    //         // BindGroupLayoutEntry {
+    //         //     binding: 1,
+    //         //     visibility: ShaderStages::FRAGMENT,
+    //         //     ty: BindingType::Texture {
+    //         //         sample_type: TextureSampleType::Float,
+    //         //         view_dimension: TextureViewDimension::D2,
+    //         //         multisampled: false,
+    //         //     },
+    //         //     count: None,
+    //         // },
+    //         // 更多绑定项（如时间步长、参数等）
+    //     ],
+    //     ..Default::default()
+    // });
+    let advection_bind_group =device.create_bind_group(
+        None,
+        &reset_pipeline.reset_bind_group_layout,
+        &[
+            BindGroupEntry {
                 binding: 0,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float,
-                    view_dimension: TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
+                resource: velocity_texture.view(),
             },
-            BindGroupLayoutEntry {
+            BindGroupEntry {
                 binding: 1,
-                visibility: ShaderStage::FRAGMENT,
-                ty: BindingType::Texture {
-                    sample_type: TextureSampleType::Float,
-                    view_dimension: TextureViewDimension::D2,
-                    multisampled: false,
+                resource: velocity_texture.view(),
+            },
+            BindGroupEntry {
+                binding: 2,
+                resource: burns_texture.view(),
+            },
+            BindGroupEntry {
+                binding: 3,
+                resource: BindingResource::Sampler(),
+            },
+            // 绑定时间步长
+            BindGroupEntry {
+                binding: 4,
+                resource: BufferBinding {
+                    buffer: AdvectionUniform{
+                        dt,
+                        texel_size:Vec2::new(1./512,1./512),
+                        dissipation:0.99
+                    },
+                    offset: 0,
+                    size: AdvectionUniform::min_size(),
                 },
-                count: None,
             },
-            // 更多绑定项（如时间步长、参数等）
-        ]),
-        ..Default::default()
-    });
+        ]
+    );
 
-    let advection_bind_group = BindGroup::new(device, &advection_pipeline, &vec![
-        // 绑定纹理
-        BindGroupEntry {
-            binding: 0,
-            resource: velocity_texture.view(),
-        },
-        BindGroupEntry {
-            binding: 1,
-            resource: velocity_texture.view(),
-        },
-        // 绑定时间步长
-        BindGroupEntry {
-            binding: 2,
-            resource: BufferBinding {
-                buffer: dt.into(),
-                offset: 0,
-                size: wgpu::BufferSize::new(),
-            },
-        },
-    ]);
 
     // 执行平流计算，将结果写入到 `velocity.write[1]`
-    commands.spawn_bundle(RenderPipeline::new(advection_pipeline))
-        .insert(advection_bind_group);
+    // commands.spawn_bundle(RenderPipeline::new(advection_pipeline))
+    //     .insert(advection_bind_group);
 
     // 2. 更新燃烧纹理
     queue.write_texture(
@@ -1140,7 +1201,7 @@ fn update(
     let curl_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
         vertex: ShaderStage::from(curl_shader.clone()),
         fragment: Some(ShaderStage::from(curl_shader)),
-        layout: Some(vec![/* BindGroup entries for curl */]),
+        layout: vec![],
         ..Default::default()
     });
 
@@ -1254,7 +1315,7 @@ fn splat(
     let splat_shader = Shader::from_wgsl(include_str!("splat_shader.wgsl"));
 
     // 创建管道
-    let splat_pipeline = commands.spawn_bundle(PipelineDescriptor {
+    let splat_pipeline = commands.spawn(PipelineDescriptor {
         vertex: Shader::from_wgsl(include_str!("vertex_shader.wgsl")),
         fragment: Some(splat_shader),
         ..Default::default()
@@ -1300,7 +1361,7 @@ fn splat(
     };
 
     // 执行 splat 计算
-    commands.spawn_bundle(RenderPipeline::new(splat_pipeline))
+    commands.spawn(RenderPipeline::new(splat_pipeline))
         .insert(splat_bind_group)
         .insert(Splat {
             position: splat_position,
@@ -1321,7 +1382,7 @@ fn blit(
     target_texture: Handle<Texture>,
 ) {
     // Create a full-screen quad mesh
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Quad { size: Vec2::new(2.0, 2.0), ..Default::default() })),
         material: materials.add(StandardMaterial {
             base_color_texture: Some(texture),
@@ -1345,7 +1406,7 @@ fn blit(
         });
 
     // Setup the render pipeline
-    let pipeline = commands.spawn_bundle(PipelineDescriptor {
+    let pipeline = commands.spawn(PipelineDescriptor {
         vertex: Shader::from_wgsl(include_str!("full_screen_quad_vertex.wgsl")),
         fragment: Some(Shader::from_wgsl(include_str!("full_screen_quad_fragment.wgsl"))),
         ..Default::default()

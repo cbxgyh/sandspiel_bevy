@@ -6,7 +6,6 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::view::RenderLayers;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::window::PrimaryWindow;
-use bevy_egui::{EguiContext, EguiPlugin};
 
 
 // 流体组件
@@ -339,56 +338,56 @@ fn event_handler_system(
 
 
 fn gui_system(
-    mut egui_context: ResMut<EguiContext>,
+    // mut egui_context: ResMut<EguiContext>,
     mut config: ResMut<FluidConfig>,
 ) {
-    egui::Window::new("Fluid Settings")
-        .show(egui_context.ctx_mut(), |ui| {
-            ui.add(
-                egui::Slider::new(
-                    &mut config.texture_downsample,
-                    0..=2,
-                )
-                    .text("Texture Downsample"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.density_dissipation,
-                    0.9..=1.0,
-                )
-                    .text("Density Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.velocity_dissipation,
-                    0.9..=1.0,
-                )
-                    .text("Velocity Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.pressure_dissipation,
-                    0.0..=1.0,
-                )
-                    .text("Pressure Dissipation"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.pressure_iterations,
-                    1..=60,
-                )
-                    .text("Pressure Iterations"),
-            );
-            ui.add(
-                egui::Slider::new(&mut config.curl, 0.0..=50.0)
-                    .text("Curl"),
-            );
-            ui.add(
-                egui::Slider::new(
-                    &mut config.splat_radius,
-                    0.0001..=0.01,
-                )
-                    .text("Splat Radius"),
-            );
-        });
+    // egui::Window::new("Fluid Settings")
+    //     .show(egui_context.ctx_mut(), |ui| {
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.texture_downsample,
+    //                 0..=2,
+    //             )
+    //                 .text("Texture Downsample"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.density_dissipation,
+    //                 0.9..=1.0,
+    //             )
+    //                 .text("Density Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.velocity_dissipation,
+    //                 0.9..=1.0,
+    //             )
+    //                 .text("Velocity Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.pressure_dissipation,
+    //                 0.0..=1.0,
+    //             )
+    //                 .text("Pressure Dissipation"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.pressure_iterations,
+    //                 1..=60,
+    //             )
+    //                 .text("Pressure Iterations"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(&mut config.curl, 0.0..=50.0)
+    //                 .text("Curl"),
+    //         );
+    //         ui.add(
+    //             egui::Slider::new(
+    //                 &mut config.splat_radius,
+    //                 0.0001..=0.01,
+    //             )
+    //                 .text("Splat Radius"),
+    //         );
+    //     });
 }
