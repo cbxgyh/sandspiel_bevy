@@ -14,7 +14,9 @@ pub struct ResetPipelinePlugin;
 impl Plugin for ResetPipelinePlugin {
 
     fn build(&self, app: &mut App) {
-
+        app
+            .init_resource::<ResetPipeline>()
+        ;
 
     }
 }
@@ -46,18 +48,61 @@ struct ResetBindGroups {
     sampler: Sampler,
 }
 
+#[derive(Resource)]
+struct InitResetTexture{
+    // 烧伤
+    pub burns : Texture,
+    // 密度
+    pub density : Texture,
+    // 气压
+    pub pressure: Texture,
+    // 速度
+    pub velocity: Texture,
+}
+
+impl FromWorld for InitResetTexture {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+        let texture_descriptor = TextureDescriptor {
+            label: Some("Texture"),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+            ..default()
+        };
+        let burns = render_device.create_texture(&texture_descriptor);
+        let density = render_device.create_texture(&texture_descriptor);
+        let pressure = render_device.create_texture(&texture_descriptor);
+        let velocity = render_device.create_texture(&texture_descriptor);
+        Self{
+            burns,
+            density,
+            pressure,
+            velocity,
+        }
+
+    }
+}
 
 fn prepare_bloom_bind_groups(
     clear_uniforms: Res<ComponentUniforms<ClearUniform>>,
     base_uniforms: Res<ComponentUniforms<VertexInput>>,
     render_device: Res<RenderDevice>,
-    reset_pipeline: Res<ResetPipeline>
+    reset_pipeline: Res<ResetPipeline>,
+    init_reset_texture:Res<InitResetTexture>
 ){
     render_device.create_bind_group(
         "clear_bind_group",
         &reset_pipeline.clear_bind_group_layout,
         &BindGroupEntries::sequential((
-            &bloom_texture.view(mip - 1),
+            &init_reset_texture.burns.create_view(&Default::default()),
             sampler,
             clear_uniforms.binding().unwrap(),
         )),
@@ -66,7 +111,7 @@ fn prepare_bloom_bind_groups(
         "base_bind_group",
         &reset_pipeline.base_bind_group_layout,
         &BindGroupEntries::sequential((
-            &bloom_texture.view(mip - 1),
+            &init_reset_texture.burns.create_view(&Default::default()),
             sampler,
             base_uniforms.binding().unwrap(),
         )),
@@ -175,7 +220,7 @@ impl FromWorld for ResetPipeline {
                 ShaderStages::VERTEX,
                 (
                     // The screen texture
-                    uniform_buffer::<VertexInput>(false),
+                    uniform_buffer::<VertexInput>(false)
                 ),
             ),
         );
@@ -285,31 +330,13 @@ impl render_graph::Node for GameOfLifeNode {
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
         let pipeline = world.resource::<ResetPipeline>();
-        let render_device = world.resource::<RenderDevice>();
+        let init_reset_texture = world.resource::<InitResetTexture>();
 
-        let texture_descriptor = TextureDescriptor {
-            label: Some("Texture"),
-            size: Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ..default()
-        };
-        let burns = render_device.create_texture(&texture_descriptor);
-        let density = render_device.create_texture(&texture_descriptor);
-        let pressure = render_device.create_texture(&texture_descriptor);
-        let velocity = render_device.create_texture(&texture_descriptor);
 
-        pipeline.render(world,render_context,&self.state,burns);
-        pipeline.render(world,render_context,&self.state,density);
-        pipeline.render(world,render_context,&self.state,pressure);
-        pipeline.render(world,render_context,&self.state,velocity);
+        pipeline.render(world,render_context,&self.state,init_reset_texture.burns.clone());
+        pipeline.render(world,render_context,&self.state,init_reset_texture.density.clone());
+        pipeline.render(world,render_context,&self.state,init_reset_texture.pressure.clone());
+        pipeline.render(world,render_context,&self.state,init_reset_texture.velocity.clone());
         Ok(())
     }
 }

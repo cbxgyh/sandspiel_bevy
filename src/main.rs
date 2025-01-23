@@ -69,7 +69,6 @@ fn main() {
             splat_radius: 0.005,
         })
         //local plugins
-        .add_plugins(PipelinesPlugin)
         .add_systems(Startup, setup);
 
 

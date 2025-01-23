@@ -12,17 +12,20 @@ pub struct PipelinesPlugin;
 
 impl Plugin for PipelinesPlugin {
     fn build(&self, app: &mut App) {
+        // app
+        //     .init_resource::<ResetPipeline>()
 
+        ;
     }
 
     fn finish(&self, app: &mut App) {
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-
-        render_app
-            // Initialize the pipeline
-            .init_resource::<ResetPipeline>();
+        // let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+        //     return;
+        // };
+        //
+        // render_app
+        //     // Initialize the pipeline
+        //     .init_resource::<ResetPipeline>();
 
     }
 }
@@ -871,37 +874,13 @@ impl DoubleFrameBuffer {
 //         render_pass.set_bind_group(0, bind_group, &[]);
 //     }
 // }
-pub struct BlitProgram {
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    pipeline: RenderPipeline,
-    bind_group: Option<BindGroup>,
-}
+// pub struct BlitProgram {
+//     vertex_buffer: Buffer,
+//     index_buffer: Buffer,
+//     pipeline: RenderPipeline,
+//     bind_group: Option<BindGroup>,
+// }
 
-impl FromWorld for  BlitProgram {
-    fn from_world(world: &mut World) -> Self {
-
-
-    }
-}
-
-pub fn init_buffer(
-    render_device: &Res<RenderDevice>,
-    width: u32,
-    height: u32,
-){
-    let velocity = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-    let density = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-
-
-    let divergence = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-    let curl = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-
-    let pressure = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-
-    let burns = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-    let cells = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
-    let velocity_out = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
 
 
 
