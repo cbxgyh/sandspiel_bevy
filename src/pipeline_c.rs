@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::extract_component::ExtractComponent;
-use bevy::render::render_resource::{AddressMode, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingType, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FilterMode, FragmentState, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
+use bevy::render::render_resource::{AddressMode, BindGroup, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferInitDescriptor, BufferSize, BufferUsages, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FilterMode, FragmentState, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::RenderApp;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -756,7 +756,7 @@ pub struct FrameBuffer{
 
 fn init_frame_buffers(
     render_device:Res<RenderDevice>,
-    queue: Res<RenderQueue>,
+    // queue: Res<RenderQueue>,
     width: u32,
     height: u32,
     internal_format: TextureFormat,
@@ -812,29 +812,423 @@ fn init_frame_buffers(
                 view:&tex_view,
                 resolve_target:None,
                 ops: Operations {
-                    load:LoadOp::Clear(Color{
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 1.0,
-                    }),
+                    load:LoadOp::Clear(Color::BLACK.into()),
                    store:StoreOp::default()
                 },
             }
         )],
-        depth_stencil_attachment,
+        depth_stencil_attachment:None,
         timestamp_writes: None,
         occlusion_query_set: None,
     });
-    queue.submit(Some(command_encoder.finish()));
+    // queue.submit(Some(command_encoder.finish()));
     // 设置视口
     render_pass.set_viewport(0.0, 0.0, size.width as f32, size.height as f32, 0.0, 1.0);
 
     FrameBuffer{
         texture:tex,
-        texture_view:tex_view,
+        texture_view:tex_view.clone(),
         width,
         height,
         sampler
     }
 }
+
+// pub struct WgpuProgram {
+//     pub pipeline: wgpu::RenderPipeline,
+//     pub bind_group_layout: wgpu::BindGroupLayout,
+//     pub bind_group: Option<wgpu::BindGroup>, // 用于存储 uniform 或资源绑定
+// }
+// pub fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
+//     render_pass.set_pipeline(&self.pipeline);
+//     if let Some(bind_group) = &self.bind_group {
+//         render_pass.set_bind_group(0, bind_group, &[]);
+//     }
+// }
+pub struct BlitProgram {
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    pipeline: RenderPipeline,
+    bind_group: Option<BindGroup>,
+}
+
+impl FromWorld for  BlitProgram {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+        // 创建顶点缓冲区数据（正方形的四个顶点）
+        let vertex_data: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
+        render_device.create_buffer_with_data(
+            &BufferInitDescriptor {
+                label:None,
+                contents:bytemuck::cast_slice(vertex_data.as_slice()),
+                usage: BufferUsages::VERTEX,
+            }
+        );
+
+        // 创建索引缓冲区数据（两个三角形的索引）
+        let index_data: [u16; 6] = [0, 1, 2, 0, 2, 3];
+        render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label:None,
+            contents:bytemuck::cast_slice(index_data.as_slice()),
+            usage: BufferUsages::INDEX,
+        });
+
+    }
+}
+
+// impl BlitProgram {
+//     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
+//         // 创建顶点缓冲区数据（正方形的四个顶点）
+//         let vertex_data: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
+//         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+//             label: Some("Vertex Buffer"),
+//             contents: bytemuck::cast_slice(&vertex_data),
+//             usage: wgpu::BufferUsage::VERTEX,
+//         });
+//
+//         // 创建索引缓冲区数据（两个三角形的索引）
+//         let index_data: [u16; 6] = [0, 1, 2, 0, 2, 3];
+//         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+//             label: Some("Index Buffer"),
+//             contents: bytemuck::cast_slice(&index_data),
+//             usage: wgpu::BufferUsage::INDEX,
+//         });
+//
+//         // 着色器代码（顶点和片段）
+//         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+//             label: Some("Vertex Shader"),
+//             source: wgpu::ShaderSource::Wgsl(include_str!("vertex.wgsl").into()),
+//         });
+//
+//         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+//             label: Some("Fragment Shader"),
+//             source: wgpu::ShaderSource::Wgsl(include_str!("fragment.wgsl").into()),
+//         });
+//
+//         // 创建管线布局
+//         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+//             label: Some("Pipeline Layout"),
+//             bind_group_layouts: &[],
+//             push_constant_ranges: &[],
+//         });
+//
+//         // 创建渲染管线
+//         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+//             label: Some("Render Pipeline"),
+//             layout: Some(&pipeline_layout),
+//             vertex: wgpu::VertexState {
+//                 module: &vertex_shader,
+//                 entry_point: "main",
+//                 buffers: &[wgpu::VertexBufferLayout {
+//                     array_stride: std::mem::size_of::<f32>() as wgpu::BufferAddress * 2,
+//                     step_mode: wgpu::InputStepMode::Vertex,
+//                     attributes: &[wgpu::VertexAttribute {
+//                         offset: 0,
+//                         format: wgpu::VertexFormat::Float2,
+//                         shader_location: 0,
+//                     }],
+//                 }],
+//             },
+//             fragment: Some(wgpu::FragmentState {
+//                 module: &fragment_shader,
+//                 entry_point: "main",
+//                 targets: &[wgpu::ColorTargetState {
+//                     format: wgpu::TextureFormat::Bgra8Unorm,
+//                     blend: Some(wgpu::BlendState::REPLACE),
+//                     write_mask: wgpu::ColorWrites::ALL,
+//                 }],
+//             }),
+//             primitive: wgpu::PrimitiveState {
+//                 topology: wgpu::PrimitiveTopology::TriangleList,
+//                 strip_index_format: None,
+//                 front_face: wgpu::FrontFace::Ccw,
+//                 cull_mode: Some(wgpu::Face::Back),
+//                 unclipped_depth: false,
+//                 polygon_mode: wgpu::PolygonMode::Fill,
+//                 conservative: false,
+//             },
+//             depth_stencil: None,
+//             multisample: wgpu::MultisampleState {
+//                 count: 1,
+//                 mask: !0,
+//                 alpha_to_coverage_enabled: false,
+//             },
+//             multiview: None,
+//         });
+//
+//         Self {
+//             vertex_buffer,
+//             index_buffer,
+//             pipeline,
+//             bind_group: None,
+//         }
+//     }
+//
+//     pub fn blit(&self, device: &wgpu::Device, queue: &wgpu::Queue, frame: &wgpu::TextureView, width: u32, height: u32) {
+//         // 创建渲染通道
+//         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+//             label: Some("Command Encoder"),
+//         });
+//
+//         // 设置渲染目标
+//         let render_pass_descriptor = wgpu::RenderPassDescriptor {
+//             label: Some("Render Pass"),
+//             color_attachments: &[wgpu::RenderPassColorAttachment {
+//                 view: frame,
+//                 resolve_target: None,
+//                 ops: wgpu::Operations {
+//                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+//                     store: true,
+//                 },
+//             }],
+//             depth_stencil_attachment: None,
+//         };
+//
+//         let mut render_pass = encoder.begin_render_pass(&render_pass_descriptor);
+//
+//         // 绑定管线和缓冲区
+//         render_pass.set_pipeline(&self.pipeline);
+//         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+//         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+//
+//         // 执行绘制操作
+//         render_pass.draw_indexed(0..6, 0, 0..1);
+//
+//         // 提交命令
+//         queue.submit(Some(encoder.finish()));
+//     }
+// }
+
+
+
+
+
+// use wgpu::util::DeviceExt;
+// use wgpu::Color;
+//
+// pub struct SplatProgram {
+//     program: wgpu::RenderPipeline,
+//     uniforms: SplatUniforms,
+//     bind_group: Option<wgpu::BindGroup>,
+// }
+//
+// pub struct SplatUniforms {
+//     u_target: wgpu::BindGroupLayoutEntry,
+//     aspect_ratio: wgpu::BindGroupLayoutEntry,
+//     point: wgpu::BindGroupLayoutEntry,
+//     color: wgpu::BindGroupLayoutEntry,
+//     radius: wgpu::BindGroupLayoutEntry,
+// }
+//
+// impl SplatProgram {
+//     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
+//         let splat_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+//             label: Some("Splat Shader"),
+//             source: wgpu::ShaderSource::Wgsl(include_str!("splat_shader.wgsl").into()),
+//         });
+//
+//         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+//             label: Some("Splat Bind Group Layout"),
+//             entries: &[
+//                 // uTarget
+//                 wgpu::BindGroupLayoutEntry {
+//                     binding: 0,
+//                     visibility: wgpu::ShaderStage::FRAGMENT,
+//                     ty: wgpu::BindingType::Texture {
+//                         sample_type: wgpu::TextureSampleType::Float,
+//                         view_dimension: wgpu::TextureViewDimension::D2,
+//                         multisampled: false,
+//                     },
+//                     count: None,
+//                 },
+//                 // aspectRatio
+//                 wgpu::BindGroupLayoutEntry {
+//                     binding: 1,
+//                     visibility: wgpu::ShaderStage::FRAGMENT,
+//                     ty: wgpu::BindingType::UniformBuffer {
+//                         dynamic: false,
+//                         min_binding_size: None,
+//                     },
+//                     count: None,
+//                 },
+//                 // point
+//                 wgpu::BindGroupLayoutEntry {
+//                     binding: 2,
+//                     visibility: wgpu::ShaderStage::FRAGMENT,
+//                     ty: wgpu::BindingType::UniformBuffer {
+//                         dynamic: false,
+//                         min_binding_size: None,
+//                     },
+//                     count: None,
+//                 },
+//                 // color
+//                 wgpu::BindGroupLayoutEntry {
+//                     binding: 3,
+//                     visibility: wgpu::ShaderStage::FRAGMENT,
+//                     ty: wgpu::BindingType::UniformBuffer {
+//                         dynamic: false,
+//                         min_binding_size: None,
+//                     },
+//                     count: None,
+//                 },
+//                 // radius
+//                 wgpu::BindGroupLayoutEntry {
+//                     binding: 4,
+//                     visibility: wgpu::ShaderStage::FRAGMENT,
+//                     ty: wgpu::BindingType::UniformBuffer {
+//                         dynamic: false,
+//                         min_binding_size: None,
+//                     },
+//                     count: None,
+//                 },
+//             ],
+//         });
+//
+//         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+//             label: Some("Splat Pipeline Layout"),
+//             bind_group_layouts: &[&bind_group_layout],
+//             push_constant_ranges: &[],
+//         });
+//
+//         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+//             label: Some("Splat Render Pipeline"),
+//             layout: Some(&pipeline_layout),
+//             vertex: wgpu::VertexState {
+//                 module: &splat_shader,
+//                 entry_point: "main",
+//                 buffers: &[],
+//             },
+//             fragment: Some(wgpu::FragmentState {
+//                 module: &splat_shader,
+//                 entry_point: "main",
+//                 targets: &[wgpu::ColorTargetState {
+//                     format: wgpu::TextureFormat::Bgra8Unorm,
+//                     blend: Some(wgpu::BlendState::REPLACE),
+//                     write_mask: wgpu::ColorWrites::ALL,
+//                 }],
+//             }),
+//             primitive: wgpu::PrimitiveState {
+//                 topology: wgpu::PrimitiveTopology::TriangleList,
+//                 strip_index_format: None,
+//                 front_face: wgpu::FrontFace::Ccw,
+//                 cull_mode: Some(wgpu::Face::Back),
+//                 unclipped_depth: false,
+//                 polygon_mode: wgpu::PolygonMode::Fill,
+//                 conservative: false,
+//             },
+//             depth_stencil: None,
+//             multisample: wgpu::MultisampleState {
+//                 count: 1,
+//                 mask: !0,
+//                 alpha_to_coverage_enabled: false,
+//             },
+//             multiview: None,
+//         });
+//
+//         Self {
+//             program: render_pipeline,
+//             uniforms: SplatUniforms {
+//                 u_target: bind_group_layout.entries[0].clone(),
+//                 aspect_ratio: bind_group_layout.entries[1].clone(),
+//                 point: bind_group_layout.entries[2].clone(),
+//                 color: bind_group_layout.entries[3].clone(),
+//                 radius: bind_group_layout.entries[4].clone(),
+//             },
+//             bind_group: None,
+//         }
+//     }
+//
+//     pub fn splat(
+//         &mut self,
+//         device: &wgpu::Device,
+//         queue: &wgpu::Queue,
+//         frame: &wgpu::TextureView,
+//         velocity: &VelocityField,
+//         density: &DensityField,
+//         x: f32,
+//         y: f32,
+//         dx: f32,
+//         dy: f32,
+//         color: [f32; 3],
+//         size: f32,
+//     ) {
+//         // Bind to the splat shader program
+//         let tex_unit = 0;
+//         let mut bind_group_entries = vec![
+//             wgpu::BindGroupEntry {
+//                 binding: 0,
+//                 resource: wgpu::BindingResource::TextureView(&velocity.read[0]),
+//             },
+//             wgpu::BindGroupEntry {
+//                 binding: 1,
+//                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+//                     buffer: &self.uniforms.aspect_ratio,
+//                     offset: 0,
+//                     size: None,
+//                 }),
+//             },
+//             wgpu::BindGroupEntry {
+//                 binding: 2,
+//                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+//                     buffer: &self.uniforms.point,
+//                     offset: 0,
+//                     size: None,
+//                 }),
+//             },
+//             wgpu::BindGroupEntry {
+//                 binding: 3,
+//                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+//                     buffer: &self.uniforms.color,
+//                     offset: 0,
+//                     size: None,
+//                 }),
+//             },
+//             wgpu::BindGroupEntry {
+//                 binding: 4,
+//                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+//                     buffer: &self.uniforms.radius,
+//                     offset: 0,
+//                     size: None,
+//                 }),
+//             },
+//         ];
+//
+//         // Create bind group
+//         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
+//             layout: &self.program.layout,
+//             entries: &bind_group_entries,
+//             label: Some("Splat Bind Group"),
+//         }));
+//
+//         // Create command encoder and render pass
+//         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+//             label: Some("Splat Command Encoder"),
+//         });
+//
+//         let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+//             label: Some("Splat Render Pass"),
+//             color_attachments: &[wgpu::RenderPassColorAttachment {
+//                 view: frame,
+//                 resolve_target: None,
+//                 ops: wgpu::Operations {
+//                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+//                     store: true,
+//                 },
+//             }],
+//             depth_stencil_attachment: None,
+//         });
+//
+//         render_pass.set_pipeline(&self.program);
+//         render_pass.set_bind_group(0, &self.bind_group.as_ref().unwrap(), &[]);
+//
+//         // Execute splat operation
+//         render_pass.draw(0..6, 0..1);
+//
+//         // Submit command to queue
+//         queue.submit(Some(encoder.finish()));
+//
+//         // Swap velocity and density textures (not shown in this example)
+//         velocity.swap();
+//         density.swap();
+//     }
+// }
