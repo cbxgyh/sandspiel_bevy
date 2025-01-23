@@ -7,6 +7,7 @@ mod category;
 mod utils;
 mod render;
 mod pipeline_c;
+mod pipeline_reset;
 
 use bevy::prelude::*;
 use bevy::render::{RenderApp, RenderPlugin};
@@ -25,7 +26,12 @@ struct FluidConfig {
     splat_radius: f32,
 }
 
-
+pub enum GameOfLifeState {
+    Loading,
+    Init,
+    Update,
+    Reset
+}
 fn main() {
     let mut app = App::new();
 

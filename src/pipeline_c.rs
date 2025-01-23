@@ -753,86 +753,112 @@ pub struct FrameBuffer{
     pub width: u32,
     pub height: u32,
 }
-
-fn init_frame_buffers(
-    render_device:Res<RenderDevice>,
-    // queue: Res<RenderQueue>,
-    width: u32,
-    height: u32,
-    internal_format: TextureFormat,
-    filter_mode: FilterMode,
-
-) ->FrameBuffer{
-
-    let size = Extent3d {
-        width,
-        height,
-        ..default()
-    };
+impl FrameBuffer {
+    fn init_frame_buffers(
+        render_device: &Res<RenderDevice>,
+        // queue: Res<RenderQueue>,
+        width: u32,
+        height: u32,
+        internal_format: TextureFormat,
+        filter_mode: FilterMode,
+    ) -> FrameBuffer {
+        let size = Extent3d {
+            width,
+            height,
+            ..default()
+        };
 
 
-    let tex=render_device.create_texture(
-        &TextureDescriptor{
-            label:None,
-            size,
-            mip_level_count:1,
-            sample_count:1,
-            dimension: TextureDimension::D2,
-            // format: TextureFormat::Rgba8UnormSrgb,
-            format:internal_format,
-            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        }
-    );
-    let tex_view= tex.create_view(&Default::default());
-
-    let sampler=render_device.create_sampler(&SamplerDescriptor {
-        label: Some("framebuffer Sampler"),
-        address_mode_u: AddressMode::ClampToEdge,
-        address_mode_v: AddressMode::ClampToEdge,
-        address_mode_w: AddressMode::ClampToEdge,
-        mag_filter: filter_mode,
-        // mag_filter: FilterMode::Linear,
-        // min_filter: FilterMode::Linear,
-        min_filter: filter_mode,
-        mipmap_filter:FilterMode::Nearest,
-        ..Default::default()
-    });
-
-    let mut command_encoder =render_device.create_command_encoder(
-        &CommandEncoderDescriptor {
-            label: Some("main_opaque_pass_3d_command_encoder"),
-        }
-    );
-
-    let mut render_pass = command_encoder.begin_render_pass(&RenderPassDescriptor {
-        label: Some("main_opaque_pass_3d"),
-        color_attachments: &[Some(
-            RenderPassColorAttachment {
-                view:&tex_view,
-                resolve_target:None,
-                ops: Operations {
-                    load:LoadOp::Clear(Color::BLACK.into()),
-                   store:StoreOp::default()
-                },
+        let tex = render_device.create_texture(
+            &TextureDescriptor {
+                label: None,
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                // format: TextureFormat::Rgba8UnormSrgb,
+                format: internal_format,
+                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
             }
-        )],
-        depth_stencil_attachment:None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
-    // queue.submit(Some(command_encoder.finish()));
-    // 设置视口
-    render_pass.set_viewport(0.0, 0.0, size.width as f32, size.height as f32, 0.0, 1.0);
+        );
+        let tex_view = tex.create_view(&Default::default());
 
-    FrameBuffer{
-        texture:tex,
-        texture_view:tex_view.clone(),
-        width,
-        height,
-        sampler
+        let sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("framebuffer Sampler"),
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            address_mode_w: AddressMode::ClampToEdge,
+            mag_filter: filter_mode,
+            // mag_filter: FilterMode::Linear,
+            // min_filter: FilterMode::Linear,
+            min_filter: filter_mode,
+            mipmap_filter: FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let mut command_encoder = render_device.create_command_encoder(
+            &CommandEncoderDescriptor {
+                label: Some("main_opaque_pass_3d_command_encoder"),
+            }
+        );
+
+        let mut render_pass = command_encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("main_opaque_pass_3d"),
+            color_attachments: &[Some(
+                RenderPassColorAttachment {
+                    view: &tex_view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK.into()),
+                        store: StoreOp::default()
+                    },
+                }
+            )],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        // queue.submit(Some(command_encoder.finish()));
+        // 设置视口
+        render_pass.set_viewport(0.0, 0.0, size.width as f32, size.height as f32, 0.0, 1.0);
+
+        FrameBuffer{
+            texture:tex,
+            texture_view:tex_view.clone(),
+            width,
+            height,
+            sampler
+        }
     }
 }
+#[derive(Resource)]
+pub struct DoubleFrameBuffer {
+    pub fbo1: FrameBuffer,
+    pub fbo2: FrameBuffer,
+}
+
+
+impl DoubleFrameBuffer {
+    pub fn new(
+        render_device: &Res<RenderDevice>,
+        // queue: Res<RenderQueue>,
+        width: u32,
+        height: u32,
+        internal_format: TextureFormat,
+        filter_mode: FilterMode,
+    )->Self{
+        let fbo1 = FrameBuffer::init_frame_buffers(render_device, width, height, internal_format, filter_mode);
+        let fbo2 = FrameBuffer::init_frame_buffers(render_device, width, height, internal_format, filter_mode);
+
+        Self { fbo1, fbo2 }
+    }
+    pub fn swap(&mut self) {
+        std::mem::swap(&mut self.fbo1, &mut self.fbo2);
+    }
+
+}
+
 
 // pub struct WgpuProgram {
 //     pub pipeline: wgpu::RenderPipeline,
@@ -854,29 +880,32 @@ pub struct BlitProgram {
 
 impl FromWorld for  BlitProgram {
     fn from_world(world: &mut World) -> Self {
-        let render_device = world.resource::<RenderDevice>();
-        // 创建顶点缓冲区数据（正方形的四个顶点）
-        let vertex_data: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
-        render_device.create_buffer_with_data(
-            &BufferInitDescriptor {
-                label:None,
-                contents:bytemuck::cast_slice(vertex_data.as_slice()),
-                usage: BufferUsages::VERTEX,
-            }
-        );
 
-        // 创建索引缓冲区数据（两个三角形的索引）
-        let index_data: [u16; 6] = [0, 1, 2, 0, 2, 3];
-        render_device.create_buffer_with_data(&BufferInitDescriptor {
-            label:None,
-            contents:bytemuck::cast_slice(index_data.as_slice()),
-            usage: BufferUsages::INDEX,
-        });
 
     }
 }
 
-// impl BlitProgram {
+pub fn init_buffer(
+    render_device: &Res<RenderDevice>,
+    width: u32,
+    height: u32,
+){
+    let velocity = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+    let density = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+
+
+    let divergence = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+    let curl = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+
+    let pressure = DoubleFrameBuffer::new(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+
+    let burns = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+    let cells = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+    let velocity_out = FrameBuffer::init_frame_buffers(render_device,width,height,TextureFormat::Rgba8UnormSrgb,FilterMode::Linear);
+
+
+
+    // impl BlitProgram {
 //     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
 //         // 创建顶点缓冲区数据（正方形的四个顶点）
 //         let vertex_data: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
