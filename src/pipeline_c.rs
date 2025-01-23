@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use bevy::render::extract_component::ExtractComponent;
-use bevy::render::render_resource::{BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingType, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, FragmentState, MultisampleState, PipelineCache, PrimitiveState, RenderPipelineDescriptor, SamplerBindingType, ShaderStages, ShaderType, TextureFormat, TextureSampleType, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
+use bevy::render::render_resource::{AddressMode, BindGroupLayout, BindGroupLayoutEntries, BindGroupLayoutEntry, BindingType, BufferBindingType, BufferSize, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FilterMode, FragmentState, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDimension, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::RenderApp;
-use bevy::render::renderer::RenderDevice;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy::render::texture::BevyDefault;
 use bytemuck::{Pod, Zeroable};
 
@@ -742,9 +742,99 @@ impl FromWorld for ResetPipeline {
                     init_pressure_pipeline,
                     init_gradient_subtract_pipeline,
                     init_sand_subtract_pipeline
-
                 }
+    }
+}
+
+pub struct FrameBuffer{
+    pub texture: Texture,
+    pub texture_view: TextureView,
+    pub sampler: Sampler,
+    pub width: u32,
+    pub height: u32,
+}
+
+fn init_frame_buffers(
+    render_device:Res<RenderDevice>,
+    queue: Res<RenderQueue>,
+    width: u32,
+    height: u32,
+    internal_format: TextureFormat,
+    filter_mode: FilterMode,
+
+) ->FrameBuffer{
+
+    let size = Extent3d {
+        width,
+        height,
+        ..default()
+    };
 
 
+    let tex=render_device.create_texture(
+        &TextureDescriptor{
+            label:None,
+            size,
+            mip_level_count:1,
+            sample_count:1,
+            dimension: TextureDimension::D2,
+            // format: TextureFormat::Rgba8UnormSrgb,
+            format:internal_format,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        }
+    );
+    let tex_view= tex.create_view(&Default::default());
+
+    let sampler=render_device.create_sampler(&SamplerDescriptor {
+        label: Some("framebuffer Sampler"),
+        address_mode_u: AddressMode::ClampToEdge,
+        address_mode_v: AddressMode::ClampToEdge,
+        address_mode_w: AddressMode::ClampToEdge,
+        mag_filter: filter_mode,
+        // mag_filter: FilterMode::Linear,
+        // min_filter: FilterMode::Linear,
+        min_filter: filter_mode,
+        mipmap_filter:FilterMode::Nearest,
+        ..Default::default()
+    });
+
+    let mut command_encoder =render_device.create_command_encoder(
+        &CommandEncoderDescriptor {
+            label: Some("main_opaque_pass_3d_command_encoder"),
+        }
+    );
+
+    let mut render_pass = command_encoder.begin_render_pass(&RenderPassDescriptor {
+        label: Some("main_opaque_pass_3d"),
+        color_attachments: &[Some(
+            RenderPassColorAttachment {
+                view:&tex_view,
+                resolve_target:None,
+                ops: Operations {
+                    load:LoadOp::Clear(Color{
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
+                   store:StoreOp::default()
+                },
+            }
+        )],
+        depth_stencil_attachment,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+    });
+    queue.submit(Some(command_encoder.finish()));
+    // 设置视口
+    render_pass.set_viewport(0.0, 0.0, size.width as f32, size.height as f32, 0.0, 1.0);
+
+    FrameBuffer{
+        texture:tex,
+        texture_view:tex_view,
+        width,
+        height,
+        sampler
     }
 }
