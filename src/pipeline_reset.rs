@@ -1,7 +1,7 @@
 use bevy::core::{Pod, Zeroable};
 use bevy::prelude::*;
 use bevy::render::extract_component::{ComponentUniforms, ExtractComponent};
-use bevy::render::render_graph;
+use bevy::render::{render_graph, RenderApp};
 use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferInitDescriptor, BufferUsages, CachedPipelineState, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FragmentState, IndexFormat, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
@@ -14,10 +14,20 @@ pub struct ResetPipelinePlugin;
 impl Plugin for ResetPipelinePlugin {
 
     fn build(&self, app: &mut App) {
-        app.init_resource::<ResetPipeline>()
 
-        ;
 
+        // ;
+
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app
+            // Initialize the pipeline
+            .init_resource::<ResetPipeline>();
     }
 }
 #[repr(C)]
@@ -74,7 +84,7 @@ impl FromWorld for InitTexture {
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ..default()
+            view_formats: &[]
         };
         let burns = render_device.create_texture(&texture_descriptor);
         let density = render_device.create_texture(&texture_descriptor);
@@ -124,14 +134,14 @@ impl ResetPipeline{
     ){
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = world.resource::<ResetPipeline>();
-
+        let tex_view = tex.create_view(&Default::default());
         let mut pass = render_context
             .command_encoder()
             .begin_render_pass(&RenderPassDescriptor {
                 label: Some("reset_render_pass"),
                 color_attachments: &[Some(
                     RenderPassColorAttachment {
-                        view: &tex.create_view(&Default::default()),
+                        view: &tex_view,
                         resolve_target: None,
                         ops: Operations {
                             load: LoadOp::Clear(Color::BLACK.into()),
@@ -155,8 +165,8 @@ impl ResetPipeline{
                     .get_render_pipeline(pipeline.pipeline)
                     .unwrap();
                 pass.set_pipeline(init_pipeline);
-                pass.set_vertex_buffer(0, pipeline.vertex_buffer.slice(..).into());
-                pass.set_index_buffer(pipeline.index_buffer.slice(..).into(), IndexFormat::Uint16);
+                pass.set_vertex_buffer(0, *pipeline.vertex_buffer.slice(..));
+                pass.set_index_buffer(*pipeline.index_buffer.slice(..), IndexFormat::Uint16);
                 pass.draw_indexed(0..pipeline.vertex_count, 0, 0..1);
                 // pass.dispatch_workgroups(SIZE.0 / WORKGROUP_SIZE, SIZE.1 / WORKGROUP_SIZE, 1);
             }
@@ -196,7 +206,7 @@ impl FromWorld for ResetPipeline {
         });
 
         let clear_shader=asser_server.load("shader/clear.wgsl");
-        let base_vertex_shader=asser_server.load("baseVertex.wgsl");
+        let base_vertex_shader=asser_server.load("shader/baseVertex.wgsl");
         let clear_layout = render_device.create_bind_group_layout(
             "clear_layout",
             &BindGroupLayoutEntries::sequential(
@@ -346,7 +356,7 @@ impl render_graph::Node for GameOfLifeNode {
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ..default()
+            view_formats:&[]
         };
         let burns = render_device.create_texture(&texture_descriptor);
         let density = render_device.create_texture(&texture_descriptor);
@@ -418,3 +428,8 @@ impl render_graph::Node for GameOfLifeNode {
 //     views: Query<(Entity, &BloomTexture)>,
 //     uniforms: Res<ComponentUniforms<BloomUniforms>>,
 // ) {
+
+// let mut render_pass = TrackedRenderPass::new(&render_device, render_pass);
+// if let Some(viewport) = camera.viewport.as_ref() {
+// render_pass.set_camera_viewport(viewport);
+// }

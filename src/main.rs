@@ -80,9 +80,9 @@ fn setup(mut commands: Commands, mut time: ResMut<Time<Fixed>>) {
     time.set_timestep_hz(58.);
 
     let mut camera = Camera2dBundle::default();
-    camera.camera.hdr = true;
-    camera.transform.scale.x = 0.23;
-    camera.transform.scale.y = 0.23;
+    // camera.camera.hdr = true;
+    // camera.transform.scale.x = 0.23;
+    // camera.transform.scale.y = 0.23;
 
     commands.spawn(camera);
 }
