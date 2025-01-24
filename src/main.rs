@@ -13,7 +13,7 @@ use bevy::prelude::*;
 use bevy::render::{RenderApp, RenderPlugin};
 use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::window::{PresentMode, WindowResolution};
-use crate::pipeline_c::{PipelinesPlugin, ResetPipeline};
+use crate::pipeline_reset::{ResetPipelinePlugin};
 
 #[derive(Resource)]
 struct FluidConfig {
@@ -69,7 +69,7 @@ fn main() {
             splat_radius: 0.005,
         })
         //local plugins
-        .add_plugins(PipelinesPlugin)
+        .add_plugins(ResetPipelinePlugin)
         .add_systems(Startup, setup);
 
 
