@@ -1,25 +1,22 @@
+use std::time::Duration;
 use bevy::core::{Pod, Zeroable};
 use bevy::prelude::*;
-use bevy::render::extract_component::{ComponentUniforms, ExtractComponent};
-use bevy::render::render_graph;
-use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferInitDescriptor, BufferUsages, CachedPipelineState, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FragmentState, IndexFormat, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
+use bevy::render::extract_component::{ComponentUniforms, ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin};
+use bevy::render::{render_graph, RenderApp};
+use bevy::render::extract_resource::ExtractResourcePlugin;
+use bevy::render::render_graph::{RenderGraph, RenderLabel};
+use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferInitDescriptor, BufferUsages, CachedPipelineState, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FragmentState, IndexFormat, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use bevy::render::texture::BevyDefault;
-use crate::GameOfLifeState;
+use rand::Rng;
+use crate::{ GameOfLifeState};
+use crate::species::Species;
 
 pub struct ResetPipelinePlugin;
 
 
-impl Plugin for ResetPipelinePlugin {
 
-    fn build(&self, app: &mut App) {
-        app
-            .init_resource::<ResetPipeline>()
-        ;
-
-    }
-}
 #[repr(C)]
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct ClearUniform {
@@ -49,20 +46,19 @@ struct ResetBindGroups {
 }
 
 #[derive(Resource)]
-struct InitResetTexture{
-    // 烧伤
-    pub burns : Texture,
-    // 密度
-    pub density : Texture,
-    // 气压
-    pub pressure: Texture,
-    // 速度
-    pub velocity: Texture,
+struct InitTexture{
+     pub burns:Texture,
+     pub density:Texture,
+     pub pressure:Texture,
+     pub velocity:Texture,
 }
 
-impl FromWorld for InitResetTexture {
+impl FromWorld for InitTexture {
     fn from_world(world: &mut World) -> Self {
+
         let render_device = world.resource::<RenderDevice>();
+        let width=300;
+        let height =300;
         let texture_descriptor = TextureDescriptor {
             label: Some("Texture"),
             size: Extent3d {
@@ -75,66 +71,64 @@ impl FromWorld for InitResetTexture {
             dimension: TextureDimension::D2,
             format: TextureFormat::Rgba8Unorm,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            ..default()
+            view_formats: &[]
         };
         let burns = render_device.create_texture(&texture_descriptor);
         let density = render_device.create_texture(&texture_descriptor);
         let pressure = render_device.create_texture(&texture_descriptor);
         let velocity = render_device.create_texture(&texture_descriptor);
-        Self{
-            burns,
-            density,
-            pressure,
-            velocity,
-        }
 
+        Self { burns, density, pressure, velocity }
     }
 }
 
-fn prepare_bloom_bind_groups(
-    clear_uniforms: Res<ComponentUniforms<ClearUniform>>,
-    base_uniforms: Res<ComponentUniforms<VertexInput>>,
-    render_device: Res<RenderDevice>,
-    reset_pipeline: Res<ResetPipeline>,
-    init_reset_texture:Res<InitResetTexture>
-){
-    render_device.create_bind_group(
-        "clear_bind_group",
-        &reset_pipeline.clear_bind_group_layout,
-        &BindGroupEntries::sequential((
-            &init_reset_texture.burns.create_view(&Default::default()),
-            sampler,
-            clear_uniforms.binding().unwrap(),
-        )),
-    );
-    render_device.create_bind_group(
-        "base_bind_group",
-        &reset_pipeline.base_bind_group_layout,
-        &BindGroupEntries::sequential((
-            &init_reset_texture.burns.create_view(&Default::default()),
-            sampler,
-            base_uniforms.binding().unwrap(),
-        )),
-    );
-}
+// fn prepare_bloom_bind_groups(
+//     clear_uniforms: Res<ComponentUniforms<ClearUniform>>,
+//     base_uniforms: Res<ComponentUniforms<VertexInput>>,
+//     render_device: Res<RenderDevice>,
+//     reset_pipeline: Res<ResetPipeline>,
+//     init_texture: Res<InitTexture>
+// ){
+//
+//     let sampler=render_device.create_sampler(&SamplerDescriptor::default());
+//     let burns_clear_bing_group=render_device.create_bind_group(
+//         "clear_bind_group",
+//         &reset_pipeline.clear_bind_group_layout,
+//         &BindGroupEntries::sequential((
+//             &init_texture.burns.create_view(&Default::default()),
+//             &sampler,
+//             clear_uniforms.binding().unwrap(),
+//         )),
+//     );
+//     let burns_base_bing_group= render_device.create_bind_group(
+//         "base_bind_group",
+//         &reset_pipeline.base_bind_group_layout,
+//         &BindGroupEntries::sequential((
+//             &init_texture.burns.create_view(&Default::default()),
+//             &sampler,
+//             base_uniforms.binding().unwrap(),
+//         )),
+//     );
+// }
 impl ResetPipeline{
     pub fn render(&self,
                   world:&World,
                   render_context: &mut RenderContext,
                   state:&GameOfLifeState,
-                  tex:Texture
+                  tex:Texture,
+                  base_bind_group: &BindGroup,
+                  bind_group: BindGroup,
     ){
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = world.resource::<ResetPipeline>();
-        let texture_bind_group = &world.resource::<GameOfLifeImageBindGroup>().0;
-
+        let tex_view = tex.create_view(&Default::default());
         let mut pass = render_context
             .command_encoder()
             .begin_render_pass(&RenderPassDescriptor {
                 label: Some("reset_render_pass"),
                 color_attachments: &[Some(
                     RenderPassColorAttachment {
-                        view: &tex.create_view(&Default::default()),
+                        view: &tex_view,
                         resolve_target: None,
                         ops: Operations {
                             load: LoadOp::Clear(Color::BLACK.into()),
@@ -147,7 +141,8 @@ impl ResetPipeline{
                 occlusion_query_set: None,
             });
 
-        pass.set_bind_group(0, texture_bind_group, &[]);
+        pass.set_bind_group(0, base_bind_group, &[]);
+        pass.set_bind_group(1, &bind_group, &[]);
 
         // select the pipeline based on the current state
         match state {
@@ -157,8 +152,8 @@ impl ResetPipeline{
                     .get_render_pipeline(pipeline.pipeline)
                     .unwrap();
                 pass.set_pipeline(init_pipeline);
-                pass.set_vertex_buffer(0, pipeline.vertex_buffer.slice(..).into());
-                pass.set_index_buffer(pipeline.index_buffer.slice(..).into(), IndexFormat::Uint16);
+                pass.set_vertex_buffer(0, *pipeline.vertex_buffer.slice(..));
+                pass.set_index_buffer(*pipeline.index_buffer.slice(..), IndexFormat::Uint16);
                 pass.draw_indexed(0..pipeline.vertex_count, 0, 0..1);
                 // pass.dispatch_workgroups(SIZE.0 / WORKGROUP_SIZE, SIZE.1 / WORKGROUP_SIZE, 1);
             }
@@ -180,7 +175,8 @@ impl FromWorld for ResetPipeline {
 
         // 创建顶点缓冲区数据（正方形的四个顶点）
         let vertex_data: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
-        render_device.create_buffer_with_data(
+
+        let vertex_buffer=render_device.create_buffer_with_data(
             &BufferInitDescriptor {
                 label:None,
                 contents:bytemuck::cast_slice(vertex_data.as_slice()),
@@ -190,14 +186,14 @@ impl FromWorld for ResetPipeline {
 
         // 创建索引缓冲区数据（两个三角形的索引）
         let index_data: [u16; 6] = [0, 1, 2, 0, 2, 3];
-        render_device.create_buffer_with_data(&BufferInitDescriptor {
+        let index_buffer=render_device.create_buffer_with_data(&BufferInitDescriptor {
             label:None,
             contents:bytemuck::cast_slice(index_data.as_slice()),
             usage: BufferUsages::INDEX,
         });
 
         let clear_shader=asser_server.load("shader/clear.wgsl");
-        let base_vertex_shader=asser_server.load("baseVertex.wgsl");
+        let base_vertex_shader=asser_server.load("shader/baseVertex.wgsl");
         let clear_layout = render_device.create_bind_group_layout(
             "clear_layout",
             &BindGroupLayoutEntries::sequential(
@@ -220,7 +216,7 @@ impl FromWorld for ResetPipeline {
                 ShaderStages::VERTEX,
                 (
                     // The screen texture
-                    uniform_buffer::<VertexInput>(false)
+                    uniform_buffer::<VertexInput>(false),
                 ),
             ),
         );
@@ -330,13 +326,93 @@ impl render_graph::Node for GameOfLifeNode {
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
         let pipeline = world.resource::<ResetPipeline>();
-        let init_reset_texture = world.resource::<InitResetTexture>();
+        let render_device = world.resource::<RenderDevice>();
+        let clear_uniforms = world.resource::<ComponentUniforms<ClearUniform>>();
+        let base_uniforms = world.resource::<ComponentUniforms<VertexInput>>();
+
+        let Some(clear_uniforms) = clear_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+        let Some(base_uniforms) = base_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+
+        let width=300;
+        let height=300;
 
 
-        pipeline.render(world,render_context,&self.state,init_reset_texture.burns.clone());
-        pipeline.render(world,render_context,&self.state,init_reset_texture.density.clone());
-        pipeline.render(world,render_context,&self.state,init_reset_texture.pressure.clone());
-        pipeline.render(world,render_context,&self.state,init_reset_texture.velocity.clone());
+        let texture_descriptor = TextureDescriptor {
+            label: Some("Texture"),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+            view_formats:&[]
+        };
+        let burns = render_device.create_texture(&texture_descriptor);
+        let density = render_device.create_texture(&texture_descriptor);
+        let pressure = render_device.create_texture(&texture_descriptor);
+        let velocity = render_device.create_texture(&texture_descriptor);
+
+        let sampler=render_device.create_sampler(&SamplerDescriptor::default());
+        let burns_clear_bing_group=render_device.create_bind_group(
+            "clear_bind_group",
+            &pipeline.clear_bind_group_layout,
+            &BindGroupEntries::sequential((
+                &burns.create_view(&Default::default()),
+                &burns.create_view(&Default::default()),
+                &sampler,
+                clear_uniforms.clone(),
+            )),
+        );
+        let burns_base_bing_group= render_device.create_bind_group(
+            "base_bind_group",
+            &pipeline.base_bind_group_layout,
+            &BindGroupEntries::sequential((
+                base_uniforms,
+            )),
+        );
+        let density_clear_bing_group=render_device.create_bind_group(
+            "density_bind_group",
+            &pipeline.clear_bind_group_layout,
+            &BindGroupEntries::sequential((
+                &density.create_view(&Default::default()),
+                &density.create_view(&Default::default()),
+                &sampler,
+                clear_uniforms.clone(),
+            )),
+        );
+        let velocity_clear_bing_group=render_device.create_bind_group(
+            "velocity_bind_group",
+            &pipeline.clear_bind_group_layout,
+            &BindGroupEntries::sequential((
+                &velocity.create_view(&Default::default()),
+                &velocity.create_view(&Default::default()),
+                &sampler,
+                clear_uniforms.clone(),
+            )),
+        );
+        let pressure_clear_bing_group=render_device.create_bind_group(
+            "pressure_bind_group",
+            &pipeline.clear_bind_group_layout,
+            &BindGroupEntries::sequential((
+                &pressure.create_view(&Default::default()),
+                &pressure.create_view(&Default::default()),
+                &sampler,
+                clear_uniforms,
+            )),
+        );
+
+        pipeline.render(world,render_context,&self.state,burns,&burns_base_bing_group,burns_clear_bing_group);
+        pipeline.render(world,render_context,&self.state,density,&burns_base_bing_group,density_clear_bing_group);
+        pipeline.render(world,render_context,&self.state,pressure,&burns_base_bing_group,velocity_clear_bing_group);
+        pipeline.render(world,render_context,&self.state,velocity,&burns_base_bing_group,pressure_clear_bing_group);
         Ok(())
     }
 }
@@ -349,3 +425,129 @@ impl render_graph::Node for GameOfLifeNode {
 //     views: Query<(Entity, &BloomTexture)>,
 //     uniforms: Res<ComponentUniforms<BloomUniforms>>,
 // ) {
+
+// let mut render_pass = TrackedRenderPass::new(&render_device, render_pass);
+// if let Some(viewport) = camera.viewport.as_ref() {
+// render_pass.set_camera_viewport(viewport);
+// }
+
+#[derive(Resource)]
+struct BootState {
+    step: u32,
+    sub_step: u32,
+    timer: Timer,
+    stop_boot: bool,
+    width: f32,
+    height: f32,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct GameOfLifeLabel;
+impl Plugin for ResetPipelinePlugin {
+
+    fn build(&self, app: &mut App) {
+
+        app
+            .insert_resource(BootState {
+                step: 0,
+                sub_step: 0,
+                timer: Timer::from_seconds(0.016, TimerMode::Once),
+                stop_boot: false,
+                width: 300.0,
+                height: 300.0,
+            })
+            .add_plugins((
+                ExtractComponentPlugin::<ClearUniform>::default(),
+                UniformComponentPlugin::<ClearUniform>::default(),
+
+                ExtractComponentPlugin::<VertexInput>::default(),
+                UniformComponentPlugin::<VertexInput>::default(),
+                ))
+            .add_systems(OnEnter(GameOfLifeState::Loading),boot_system)
+        ;
+        let render_app = app.sub_app_mut(RenderApp);
+        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
+        render_graph.add_node(GameOfLifeLabel, GameOfLifeNode::default());
+        render_graph.add_node_edge(GameOfLifeLabel, bevy::render::graph::CameraDriverLabel);
+
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app
+            // Initialize the pipeline
+            .init_resource::<ResetPipeline>();
+    }
+}
+
+fn boot_system(
+    mut commands: Commands,
+                time: Res<Time>,
+                mut boot_state: ResMut<BootState>
+){
+    if boot_state.stop_boot {
+        return;
+    }
+
+    boot_state.timer.tick(time.delta());
+    if !boot_state.timer.finished() {
+        return;
+    }
+    match boot_state.step {
+        0 => {
+            // 第一个循环，绘制沙子（Species.Sand）
+            let x = 5.0 + boot_state.sub_step as f32 * 10.0;
+            if x <= boot_state.width - 5.0 {
+                let y = (boot_state.height - 40.0 + 5.0 * (x / 20.0).sin()) as i32;
+                let size = (rand::thread_rng().gen_range(0.0..6.0) + 10.0) as i32;
+                paint(&mut commands, x as i32, y, size, Species::Sand);
+                boot_state.sub_step += 1;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.016));
+                boot_state.timer.reset();
+            } else {
+                boot_state.step = 1;
+                boot_state.sub_step = 0;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.180));
+            }
+        }
+        1 => {
+            // 第二个循环，绘制种子（Species.Seed）
+            let x = 40.0 + boot_state.sub_step as f32 * (50.0 + rand::thread_rng().gen_range(0.0..10.0));
+            if x <= boot_state.width - 40.0 {
+                let y = (boot_state.height / 2.0 + 20.0 * (x / 20.0).sin()) as i32;
+                let size = 6;
+                paint(&mut commands, x as i32, y, size, Species::Seed);
+                boot_state.sub_step += 1;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.180));
+                boot_state.timer.reset();
+            } else {
+                // 可以在这里添加后续步骤
+                boot_state.stop_boot = true;
+            }
+        }
+        _ => {}
+    }
+}
+
+fn paint(commands: &mut Commands, x: i32, y: i32, size: i32, species: Species) {
+    // 这里可以实现具体的绘制逻辑，例如创建实体等
+    println!("Painting at ({}, {}), size: {}, species: {:?}", x, y, size, species);
+    // 示例：创建一个简单的精灵
+    commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: match species {
+                Species::Sand => Color::YELLOW,
+                Species::Seed => Color::GREEN,
+                Species::Stone => Color::GRAY,
+                _ => Color::WHITE,
+            },
+            custom_size: Some(Vec2::new(size as f32, size as f32)),
+            ..default()
+        },
+        transform: Transform::from_xyz(x as f32, y as f32, 0.0),
+        ..default()
+    });
+}
