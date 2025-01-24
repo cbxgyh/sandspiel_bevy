@@ -1,35 +1,22 @@
+use std::time::Duration;
 use bevy::core::{Pod, Zeroable};
 use bevy::prelude::*;
-use bevy::render::extract_component::{ComponentUniforms, ExtractComponent};
+use bevy::render::extract_component::{ComponentUniforms, ExtractComponent, ExtractComponentPlugin, UniformComponentPlugin};
 use bevy::render::{render_graph, RenderApp};
+use bevy::render::extract_resource::ExtractResourcePlugin;
+use bevy::render::render_graph::{RenderGraph, RenderLabel};
 use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferInitDescriptor, BufferUsages, CachedPipelineState, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FragmentState, IndexFormat, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
 use bevy::render::renderer::{RenderContext, RenderDevice};
 use bevy::render::texture::BevyDefault;
-use crate::GameOfLifeState;
+use rand::Rng;
+use crate::{ GameOfLifeState};
+use crate::species::Species;
 
 pub struct ResetPipelinePlugin;
 
 
-impl Plugin for ResetPipelinePlugin {
 
-    fn build(&self, app: &mut App) {
-
-
-        // ;
-
-    }
-
-    fn finish(&self, app: &mut App) {
-        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
-            return;
-        };
-
-        render_app
-            // Initialize the pipeline
-            .init_resource::<ResetPipeline>();
-    }
-}
 #[repr(C)]
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Pod, Zeroable)]
 struct ClearUniform {
@@ -342,8 +329,18 @@ impl render_graph::Node for GameOfLifeNode {
         let render_device = world.resource::<RenderDevice>();
         let clear_uniforms = world.resource::<ComponentUniforms<ClearUniform>>();
         let base_uniforms = world.resource::<ComponentUniforms<VertexInput>>();
+
+        let Some(clear_uniforms) = clear_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+        let Some(base_uniforms) = base_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+
         let width=300;
         let height=300;
+
+
         let texture_descriptor = TextureDescriptor {
             label: Some("Texture"),
             size: Extent3d {
@@ -371,14 +368,14 @@ impl render_graph::Node for GameOfLifeNode {
                 &burns.create_view(&Default::default()),
                 &burns.create_view(&Default::default()),
                 &sampler,
-                clear_uniforms.binding().unwrap(),
+                clear_uniforms.clone(),
             )),
         );
         let burns_base_bing_group= render_device.create_bind_group(
             "base_bind_group",
             &pipeline.base_bind_group_layout,
             &BindGroupEntries::sequential((
-                base_uniforms.binding().unwrap(),
+                base_uniforms,
             )),
         );
         let density_clear_bing_group=render_device.create_bind_group(
@@ -388,7 +385,7 @@ impl render_graph::Node for GameOfLifeNode {
                 &density.create_view(&Default::default()),
                 &density.create_view(&Default::default()),
                 &sampler,
-                clear_uniforms.binding().unwrap(),
+                clear_uniforms.clone(),
             )),
         );
         let velocity_clear_bing_group=render_device.create_bind_group(
@@ -398,7 +395,7 @@ impl render_graph::Node for GameOfLifeNode {
                 &velocity.create_view(&Default::default()),
                 &velocity.create_view(&Default::default()),
                 &sampler,
-                clear_uniforms.binding().unwrap(),
+                clear_uniforms.clone(),
             )),
         );
         let pressure_clear_bing_group=render_device.create_bind_group(
@@ -408,7 +405,7 @@ impl render_graph::Node for GameOfLifeNode {
                 &pressure.create_view(&Default::default()),
                 &pressure.create_view(&Default::default()),
                 &sampler,
-                clear_uniforms.binding().unwrap(),
+                clear_uniforms,
             )),
         );
 
@@ -433,3 +430,124 @@ impl render_graph::Node for GameOfLifeNode {
 // if let Some(viewport) = camera.viewport.as_ref() {
 // render_pass.set_camera_viewport(viewport);
 // }
+
+#[derive(Resource)]
+struct BootState {
+    step: u32,
+    sub_step: u32,
+    timer: Timer,
+    stop_boot: bool,
+    width: f32,
+    height: f32,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct GameOfLifeLabel;
+impl Plugin for ResetPipelinePlugin {
+
+    fn build(&self, app: &mut App) {
+
+        app
+            .insert_resource(BootState {
+                step: 0,
+                sub_step: 0,
+                timer: Timer::from_seconds(0.016, TimerMode::Once),
+                stop_boot: false,
+                width: 300.0,
+                height: 300.0,
+            })
+            .add_plugins((
+                ExtractComponentPlugin::<ClearUniform>::default(),
+                UniformComponentPlugin::<ClearUniform>::default(),
+
+                ExtractComponentPlugin::<VertexInput>::default(),
+                UniformComponentPlugin::<VertexInput>::default(),
+                ))
+            .add_systems(OnEnter(GameOfLifeState::Loading),boot_system)
+        ;
+        let render_app = app.sub_app_mut(RenderApp);
+        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
+        render_graph.add_node(GameOfLifeLabel, GameOfLifeNode::default());
+        render_graph.add_node_edge(GameOfLifeLabel, bevy::render::graph::CameraDriverLabel);
+
+    }
+
+    fn finish(&self, app: &mut App) {
+        let Ok(render_app) = app.get_sub_app_mut(RenderApp) else {
+            return;
+        };
+
+        render_app
+            // Initialize the pipeline
+            .init_resource::<ResetPipeline>();
+    }
+}
+
+fn boot_system(
+    mut commands: Commands,
+                time: Res<Time>,
+                mut boot_state: ResMut<BootState>
+){
+    if boot_state.stop_boot {
+        return;
+    }
+
+    boot_state.timer.tick(time.delta());
+    if !boot_state.timer.finished() {
+        return;
+    }
+    match boot_state.step {
+        0 => {
+            // 第一个循环，绘制沙子（Species.Sand）
+            let x = 5.0 + boot_state.sub_step as f32 * 10.0;
+            if x <= boot_state.width - 5.0 {
+                let y = (boot_state.height - 40.0 + 5.0 * (x / 20.0).sin()) as i32;
+                let size = (rand::thread_rng().gen_range(0.0..6.0) + 10.0) as i32;
+                paint(&mut commands, x as i32, y, size, Species::Sand);
+                boot_state.sub_step += 1;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.016));
+                boot_state.timer.reset();
+            } else {
+                boot_state.step = 1;
+                boot_state.sub_step = 0;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.180));
+            }
+        }
+        1 => {
+            // 第二个循环，绘制种子（Species.Seed）
+            let x = 40.0 + boot_state.sub_step as f32 * (50.0 + rand::thread_rng().gen_range(0.0..10.0));
+            if x <= boot_state.width - 40.0 {
+                let y = (boot_state.height / 2.0 + 20.0 * (x / 20.0).sin()) as i32;
+                let size = 6;
+                paint(&mut commands, x as i32, y, size, Species::Seed);
+                boot_state.sub_step += 1;
+                boot_state.timer.set_duration(Duration::from_secs_f32(0.180));
+                boot_state.timer.reset();
+            } else {
+                // 可以在这里添加后续步骤
+                boot_state.stop_boot = true;
+            }
+        }
+        _ => {}
+    }
+}
+
+fn paint(commands: &mut Commands, x: i32, y: i32, size: i32, species: Species) {
+    // 这里可以实现具体的绘制逻辑，例如创建实体等
+    println!("Painting at ({}, {}), size: {}, species: {:?}", x, y, size, species);
+    // 示例：创建一个简单的精灵
+    commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: match species {
+                Species::Sand => Color::YELLOW,
+                Species::Seed => Color::GREEN,
+                Species::Stone => Color::GRAY,
+                _ => Color::WHITE,
+            },
+            custom_size: Some(Vec2::new(size as f32, size as f32)),
+            ..default()
+        },
+        transform: Transform::from_xyz(x as f32, y as f32, 0.0),
+        ..default()
+    });
+}
