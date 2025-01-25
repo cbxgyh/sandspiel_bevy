@@ -4,6 +4,7 @@ use rand_xoshiro::SplitMix64;
 
 use std::collections::VecDeque;
 use bevy::a11y::accesskit::Role::Math;
+use bevy::prelude::Resource;
 use crate::species::Species;
 // use web_sys::console;
 // 风（Wind）和细胞（Cell）的数据结构以及 Universe（宇宙）的一部分实现
@@ -69,6 +70,7 @@ pub static EMPTY_CELL: Cell = Cell {
 // generation：宇宙当前的代数，通常用于追踪模拟的进度。
 // rng：SplitMix64 是一个伪随机数生成器，用于生成模拟中的随机事件。
 
+#[derive(Resource)]
 pub struct Universe {
     pub(crate) width: i32,
     pub(crate) height: i32,
@@ -79,7 +81,25 @@ pub struct Universe {
     pub(crate) generation: u8,
     pub(crate) rng: SplitMix64,
 }
+impl Default for Universe {
+    fn default() -> Self {
+        let n = 300 as i32;
+        let h = (n / 2 )as i32;
+        let d = (n as f64 * 0.9) as i32;
+        let mut universe = Universe::new(n , n );
+        universe.paint(10, 10, 10, Species::Sand);
 
+        universe.paint(h, h, d + 2, Species::Plant);
+        universe.paint(30, n - 10, 15, Species::Fire);
+        universe.paint(h - 30, n - 10, 15, Species::Fire);
+        // universe.paint(h, h, n / 3, Species::Air);
+        // 空气
+        universe.paint(h, h, n / 3, Species::Empty);
+
+        universe.paint(h, h, n / 3, Species::Fire);
+        universe
+    }
+}
 pub struct SandApi<'a> {
     pub(crate) x: i32,
     pub(crate) y: i32,

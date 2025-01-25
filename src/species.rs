@@ -4,7 +4,7 @@ use super::utils::*;
 // use std::cmp;
 use std::mem;
 use rand::Rng;
-use crate::category::{Cell, SandApi, Wind, EMPTY_CELL};
+use crate::universe::{Cell, SandApi, Wind, EMPTY_CELL};
 // use web_sys::console;
 
 // Species 枚举定义了在模拟中可以存在的不同物种，每个物种对应一个唯一的值。枚举值被标记为 u8 类型，表示每个物种在内存中的占用大小。这个枚举将决定每个 Cell 的物种类型，从而影响其行为和与其他细胞的交互。

@@ -8,8 +8,9 @@ struct SandUniform{
     t: f32,
     dpi: f32,
     resolution: vec2<f32>,
-
 }
+
+
 @group(1) @binding(3) var<uniform> value: SandUniform;
 fn mod1(a: f32, b: f32) -> f32 {
     return a - b * floor(a / b);

@@ -3,11 +3,12 @@
 mod boot;
 mod convert_svg;
 mod species;
-mod category;
+mod universe;
 mod utils;
 mod render;
 mod pipeline_c;
 mod pipeline_reset;
+mod pipeline_sand;
 
 use bevy::prelude::*;
 use bevy::render::{RenderApp, RenderPlugin};
@@ -15,7 +16,9 @@ use bevy::render::settings::{Backends, WgpuSettings};
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::window::{PresentMode, WindowResolution};
 use crate::pipeline_reset::{ResetPipelinePlugin};
+use crate::pipeline_sand::PipelineSandPlugin;
 use crate::species::Species;
+use crate::universe::Universe;
 
 #[derive(Resource)]
 struct FluidConfig {
@@ -73,7 +76,12 @@ fn main() {
             splat_radius: 0.005,
         })
         //local plugins
-        .add_plugins(ResetPipelinePlugin)
+        .insert_resource(Universe::default())
+        .add_plugins((
+                         ResetPipelinePlugin,
+                         PipelineSandPlugin,
+                     ))
+
         .add_systems(Startup, setup);
 
 
@@ -87,26 +95,10 @@ fn setup(mut commands: Commands,
     time.set_timestep_hz(58.);
 
     let mut camera = Camera2dBundle::default();
-    // camera.camera.hdr = true;
+    camera.camera.hdr = true;
     // camera.transform.scale.x = 0.23;
     // camera.transform.scale.y = 0.23;
-    commands.spawn(MaterialMesh2dBundle {
-        mesh: meshes.add(Circle::new(100.)).into(),
-        // 4. Put something bright in a dark environment to see the effect
-        material: materials.add(Color::rgb(7.5, 0.0, 7.5)),
-        transform: Transform::from_translation(Vec3::new(-200., 0., 0.)),
-        ..default()
-    });
 
-    commands.spawn(SpriteBundle {
-        sprite: Sprite {
-            color:  Color::YELLOW,
-            custom_size: Some(Vec2::new(200 as f32, 200 as f32)),
-            ..default()
-        },
-        transform: Transform::from_xyz(0. as f32, 0. as f32, 0.0),
-        ..default()
-    });
     commands.spawn(camera);
 }
 
