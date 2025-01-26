@@ -1,3 +1,5 @@
+
+use std::num::NonZeroU64;
 use std::time::Duration;
 use bevy::core::{Pod, Zeroable};
 use bevy::prelude::*;
@@ -407,7 +409,7 @@ impl render_graph::Node for GameOfLifeNode {
 
         match self.state {
                 GameOfLifeState::Loading => {
-                    println!("*************Loading");
+                    // println!("*************Loading");
                     let pip=world.resource::<PipelineSand>();
                     pip.render(world, render_context);
                 }
@@ -515,7 +517,8 @@ fn boot_system(
     mut boot_state: ResMut<BootState>,
     mut universe:ResMut<Universe>,
     mut render_queue: ResMut<RenderQueue>,
-    mut s:Query<Entity,With<SandUniform>>
+    mut render_device: ResMut<RenderDevice>,
+    mut sand_uniform:Query<Entity,With<SandUniform>>
 )
 {
 
@@ -557,13 +560,28 @@ fn boot_system(
                 boot_state.timer.reset();
             } else {
                 // 可以在这里添加后续步骤
+                let data:Vec<CellData>= universe.cells.iter().map(|cell| {
+                    CellData {
+                        species: cell.species.into(),
+                        ra: cell.ra,
+                        rb: cell.rb,
+                        clock: cell.clock,
+                    }
+                }).collect();
+               let cell_buffer= render_device.create_buffer_with_data(&BufferInitDescriptor {
+                    label: Some("cell"),
+                    contents: bytemuck::cast_slice(data.as_slice()),
+                    usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+                });
+                render_queue.write_buffer_with(&*cell_buffer, 0 as u64 ,NonZeroU64::new(cell_buffer.size()).unwrap());
+                println!("&&&&&&&&&&&&{:?}",universe.cells.len());
                 boot_state.stop_boot = true;
             }
         }
         _ => {}
     }
     //
-    // s.uniforms().write_buffer()
+    // sand_uniform.uniforms().write_buffer()
     // s.write_buffer()
     // render_queue.write_buffer_with()
     //

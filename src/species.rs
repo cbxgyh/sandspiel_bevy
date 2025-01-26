@@ -3,6 +3,7 @@ use super::utils::*;
 
 // use std::cmp;
 use std::mem;
+use bytemuck::{Pod, Zeroable};
 use rand::Rng;
 use crate::universe::{Cell, SandApi, Wind, EMPTY_CELL};
 // use web_sys::console;
@@ -63,6 +64,11 @@ impl Species {
             Species::Seed => update_seed(cell, api),
             // Species::X => update_x(cell, api),
         }
+    }
+}
+impl Into<u8> for Species {
+    fn into(self) -> u8 {
+        self as u8
     }
 }
 // update_sand 方法处理沙子的行为。沙子会根据周围环境进行下落：

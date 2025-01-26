@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+extern crate core;
 
 mod boot;
 mod convert_svg;
@@ -9,6 +10,7 @@ mod render;
 mod pipeline_c;
 mod pipeline_reset;
 mod pipeline_sand;
+mod pipeline_update;
 
 use bevy::prelude::*;
 use bevy::render::{RenderApp, RenderPlugin};

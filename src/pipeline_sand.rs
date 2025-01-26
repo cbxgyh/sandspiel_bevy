@@ -100,7 +100,7 @@ impl PipelineSand {
             return;
         };
 
-        println!("2_PipelineSand_render");
+        // println!("2_PipelineSand_render");
         // let sand_vertex_bind=render_device.create_bind_group(
         //     "sand_vertex_bind",
         //     &self.sand_vertex_bind_layout,

@@ -5,6 +5,7 @@ use rand_xoshiro::SplitMix64;
 use std::collections::VecDeque;
 use bevy::a11y::accesskit::Role::Math;
 use bevy::prelude::Resource;
+use bytemuck::{Pod,Zeroable};
 use crate::species::Species;
 // use web_sys::console;
 // 风（Wind）和细胞（Cell）的数据结构以及 Universe（宇宙）的一部分实现
@@ -37,6 +38,17 @@ pub struct Cell {
     pub(crate) rb: u8,
     pub(crate) clock: u8,
 }
+
+#[repr(C)]
+#[derive(Pod, Zeroable,Copy,Clone)]
+pub struct CellData {
+    pub(crate) species: u8,
+    pub(crate) ra: u8,
+    pub(crate) rb: u8,
+    pub(crate) clock: u8,
+}
+
+
 // Cell 的方法：
 // new：这是一个构造函数，创建一个新的 Cell 实例。它会基于物种（species）和随机生成的数值来初始化 ra 和 rb 属性。
 // update：调用细胞的 species 更新方法来改变细胞的状态。这个方法通过 SandApi（API 代理）来执行物种的更新逻辑。
@@ -47,6 +59,15 @@ impl Cell {
             ra:  rand::thread_rng().gen_range(0..150) as u8,
             rb: 0,
             clock: 0,
+        }
+    }
+
+    pub fn to_cell_data(&self) -> CellData {
+        CellData{
+            species:self.species.into(),
+            ra:self.ra,
+            rb:self.rb,
+            clock:self.clock
         }
     }
     pub fn update(&self, api: SandApi) {
