@@ -1,6 +1,7 @@
-@group(1) @binding(0) var data: texture_2d<f32>;
-@group(1) @binding(1) var backBuffer: texture_2d<f32>;
-@group(1) @binding(2) var uSampler: sampler;
+
+#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
+@group(0) @binding(0) var data: texture_2d<f32>;
+@group(0) @binding(1) var uSampler: sampler;
 
 
 struct SandUniform{
@@ -11,7 +12,7 @@ struct SandUniform{
 }
 
 
-@group(1) @binding(3) var<uniform> value: SandUniform;
+@group(0) @binding(2) var<uniform> value: SandUniform;
 fn mod1(a: f32, b: f32) -> f32 {
     return a - b * floor(a / b);
 }
@@ -39,22 +40,24 @@ fn hsv2rgb(hsv: vec3<f32>) -> vec3<f32> {
     }
 }
 
-
-fn snoise3(p: vec3<f32>, t: f32) -> f32 {
-    // 实现 3D Simplex 噪声，需要更复杂的实现，这里仅为占位符
-    return 0.0;
+fn snoise3(p: vec3<f32>) -> f32 {
+    let perm = vec3<f32>(151.0, 160.0, 170.0);
+    let  p_ = fract(p);
+    let  grad = (p_.x * p_.y * p_.z);
+    return grad;
 }
+
 
 
 fn snoise2(p: vec2<f32>) -> f32 {
-    // 实现 2D Simplex 噪声，需要更复杂的实现，这里仅为占位符
-    return 0.0;
+    let perm = vec2<f32>(151.0, 160.0);
+    let  p_ = fract(p);
+    let  grad = (p_.x * p_.y);
+    return grad;
 }
-
-
 fn random(p: vec2<f32>) -> f32 {
-    // 实现随机函数，需要更复杂的实现，这里仅为占位符
-    return 0.0;
+    let n = dot(p, vec2<f32>(12.9898, 78.233));
+    return fract(sin(n) * 43758.5453123);
 }
 
 
@@ -66,7 +69,7 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     var hue: f32 = 0.0;
     var saturation: f32 = 0.6;
     var lightness: f32 = 0.3 + data.g * 0.5;
-    let noise: f32 = snoise3(vec3<f32>(floor(uv * value.resolution / value.dpi), value.t * 0.05),1.0);
+    let noise: f32 = snoise3(vec3<f32>(floor(uv * value.resolution / value.dpi), value.t * 0.05));
     var a: f32 = 1.0;
 
 

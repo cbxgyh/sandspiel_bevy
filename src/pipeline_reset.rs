@@ -7,11 +7,11 @@ use bevy::render::{render_graph, RenderApp};
 use bevy::render::render_graph::{RenderGraph, RenderLabel};
 use bevy::render::render_resource::{BindGroup, BindGroupDescriptor, BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, Buffer, BufferInitDescriptor, BufferUsages, CachedPipelineState, CachedRenderPipelineId, ColorTargetState, ColorWrites, CommandEncoderDescriptor, Extent3d, FragmentState, IndexFormat, LoadOp, MultisampleState, Operations, PipelineCache, PrimitiveState, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, StoreOp, Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode};
 use bevy::render::render_resource::binding_types::{sampler, texture_2d, uniform_buffer};
-use bevy::render::renderer::{RenderContext, RenderDevice};
+use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
 use bevy::render::texture::BevyDefault;
 use rand::Rng;
 use crate::{ GameOfLifeState};
-use crate::pipeline_sand::{PipelineSand, SandUniform,SanVertexInput};
+use crate::pipeline_sand::{PipelineSand, SandUniform};
 use crate::universe::*;
 use crate::species::Species;
 
@@ -71,7 +71,7 @@ impl FromWorld for InitTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::Rgba8UnormSrgb,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[]
         };
@@ -145,7 +145,7 @@ impl ResetPipeline{
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Rgba8Unorm,
+            format: TextureFormat::Rgba8UnormSrgb,
             usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
             view_formats:&[]
         };
@@ -327,8 +327,6 @@ impl FromWorld for ResetPipeline {
                 fragment: Some(FragmentState {
                     shader: clear_shader.clone(),
                     shader_defs: vec![],
-                    // Make sure this matches the entry point of your shader.
-                    // It can be anything as long as it matches here and in the shader.
                     entry_point: "main".into(),
                     targets: vec![Some(ColorTargetState {
                         format: TextureFormat::bevy_default(),
@@ -336,14 +334,12 @@ impl FromWorld for ResetPipeline {
                         write_mask: ColorWrites::ALL,
                     })],
                 }),
-                // All of the following properties are not important for this effect so just use the default values.
-                // This struct doesn't have the Default trait implemented because not all field can have a default value.
                 primitive: PrimitiveState::default(),
                 depth_stencil: None,
                 multisample: MultisampleState::default(),
                 push_constant_ranges: vec![],
             });
-
+        println!("4_fromworld_PipelineRESET");
         Self{
             index_buffer,
             vertex_buffer,
@@ -377,24 +373,24 @@ impl render_graph::Node for GameOfLifeNode {
         // if the corresponding pipeline has loaded, transition to the next stage
         match self.state {
             GameOfLifeState::Loading => {
-                if let CachedPipelineState::Ok(_) =
-                    pipeline_cache.get_render_pipeline_state(pipeline.pipeline)
-                {
-                    self.state = GameOfLifeState::Init;
-                }
+                // if let CachedPipelineState::Ok(_) =
+                //     pipeline_cache.get_render_pipeline_state(pipeline.pipeline)
+                // {
+                //     self.state = GameOfLifeState::Init;
+                // }
             }
             GameOfLifeState::Init => {
-                if let CachedPipelineState::Ok(_) =
-                    pipeline_cache.get_render_pipeline_state(pipeline.pipeline){
-                        self.state = GameOfLifeState::Init;
-                    }
+                // if let CachedPipelineState::Ok(_) =
+                //     pipeline_cache.get_render_pipeline_state(pipeline.pipeline){
+                //         self.state = GameOfLifeState::Init;
+                //     }
             }
             GameOfLifeState::Reset => {
-                if let CachedPipelineState::Ok(_) =
-                    pipeline_cache.get_render_pipeline_state(pipeline.pipeline)
-                {
-                    self.state = GameOfLifeState::Reset;
-                }
+                // if let CachedPipelineState::Ok(_) =
+                //     pipeline_cache.get_render_pipeline_state(pipeline.pipeline)
+                // {
+                //     self.state = GameOfLifeState::Reset;
+                // }
             }
             GameOfLifeState::Update => {}
         }
@@ -402,7 +398,7 @@ impl render_graph::Node for GameOfLifeNode {
 
     fn run(
         &self,
-        _graph: &mut render_graph::RenderGraphContext,
+        graph: &mut render_graph::RenderGraphContext,
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
@@ -411,6 +407,7 @@ impl render_graph::Node for GameOfLifeNode {
 
         match self.state {
                 GameOfLifeState::Loading => {
+                    println!("*************Loading");
                     let pip=world.resource::<PipelineSand>();
                     pip.render(world, render_context);
                 }
@@ -479,10 +476,12 @@ impl Plugin for ResetPipelinePlugin {
                 UniformComponentPlugin::<VertexInput>::default(),
                 ))
             // .add_systems(OnEnter(GameOfLifeState::Loading),boot_system)
-
+            .add_systems(OnEnter(GameOfLifeState::Loading),(
+                setup
+            ))
             .add_systems(Update,(
                 boot_system,
-                // boot_system_sprite.after(boot_system)
+                boot_system_sprite.after(boot_system)
             ))
         ;
         let render_app = app.sub_app_mut(RenderApp);
@@ -503,11 +502,20 @@ impl Plugin for ResetPipelinePlugin {
     }
 }
 
+fn setup(
+    mut commands: Commands,
+){
+    commands.spawn(
+       SandUniform::default()
+    );
+    println!("3_SandUniform_init");
+}
 fn boot_system(
     time: Res<Time>,
     mut boot_state: ResMut<BootState>,
-    mut universe:ResMut<Universe>
-
+    mut universe:ResMut<Universe>,
+    mut render_queue: ResMut<RenderQueue>,
+    mut s:Query<Entity,With<SandUniform>>
 )
 {
 
@@ -554,16 +562,24 @@ fn boot_system(
         }
         _ => {}
     }
+    //
+    // s.uniforms().write_buffer()
+    // s.write_buffer()
+    // render_queue.write_buffer_with()
+    //
+    // render_queue.write_buffer(
+    //
+    // );
 }
 
-// fn boot_system_sprite(
-//     mut commands: Commands,
-//     mut universe:ResMut<Universe>
-// ){
-//     for cell in universe.cells.iter() {
-//
-//     }
-// }
+fn boot_system_sprite(
+    mut commands: Commands,
+    mut universe:ResMut<Universe>
+){
+    for cell in universe.cells.iter() {
+
+    }
+}
 
 // fn paint(commands: &mut Commands, x: i32, y: i32, size: i32, species: Species) {
 //     // 这里可以实现具体的绘制逻辑，例如创建实体等
